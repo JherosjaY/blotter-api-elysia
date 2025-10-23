@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
+import { swagger } from "@elysiajs/swagger";
 
 // Import routes
 import { authRoutes } from "./routes/auth";
@@ -15,32 +16,36 @@ export const app = new Elysia()
       origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
     })
   )
-  // Health check
-  .get("/", ({ set }) => {
-    set.headers['content-type'] = 'application/json';
-    return JSON.stringify({
-      success: true,
-      message: "Blotter API is running!",
-      timestamp: new Date().toISOString(),
-      endpoints: {
-        swagger: "/swagger",
-        auth: "/api/auth",
-        reports: "/api/reports",
-        users: "/api/users",
-        officers: "/api/officers",
-        witnesses: "/api/witnesses",
-        suspects: "/api/suspects",
+  .use(
+    swagger({
+      documentation: {
+        info: {
+          title: "Blotter Management System API",
+          version: "1.0.0",
+        },
       },
-    });
-  })
-  .get("/health", ({ set }) => {
-    set.headers['content-type'] = 'application/json';
-    return JSON.stringify({
-      success: true,
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-    });
-  })
+    })
+  )
+  // Health check
+  .get("/", () => ({
+    success: true,
+    message: "Blotter API is running!",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      swagger: "/swagger",
+      auth: "/api/auth",
+      reports: "/api/reports",
+      users: "/api/users",
+      officers: "/api/officers",
+      witnesses: "/api/witnesses",
+      suspects: "/api/suspects",
+    },
+  }))
+  .get("/health", () => ({
+    success: true,
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+  }))
   // Mount routes
   .group("/api", (app) =>
     app
