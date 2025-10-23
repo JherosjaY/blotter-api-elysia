@@ -1,7 +1,5 @@
 import { Elysia } from "elysia";
-import { bearer } from "@elysiajs/bearer";
 import { cors } from "@elysiajs/cors";
-import { swagger } from "@elysiajs/swagger";
 
 // Import routes
 import { authRoutes } from "./routes/auth";
@@ -12,30 +10,9 @@ import { witnessesRoutes } from "./routes/witnesses";
 import { suspectsRoutes } from "./routes/suspects";
 
 export const app = new Elysia()
-  .use(bearer())
   .use(
     cors({
       origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
-    })
-  )
-  .use(
-    swagger({
-      path: "/swagger",
-      documentation: {
-        info: {
-          title: "Blotter Management System API",
-          version: "1.0.0",
-          description: "API for Blotter Management System - Elysia.js + Drizzle ORM",
-        },
-        tags: [
-          { name: "Auth", description: "Authentication endpoints" },
-          { name: "Reports", description: "Blotter reports management" },
-          { name: "Users", description: "User management" },
-          { name: "Officers", description: "Officer management" },
-          { name: "Witnesses", description: "Witness management" },
-          { name: "Suspects", description: "Suspect management" },
-        ],
-      },
     })
   )
   // Health check
