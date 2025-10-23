@@ -39,25 +39,29 @@ export const app = new Elysia()
     })
   )
   // Health check
-  .get("/", () => ({
-    success: true,
-    message: "Blotter API is running! 🚀",
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      swagger: "/swagger",
-      auth: "/api/auth",
-      reports: "/api/reports",
-      users: "/api/users",
-      officers: "/api/officers",
-      witnesses: "/api/witnesses",
-      suspects: "/api/suspects",
-    },
-  }))
-  .get("/health", () => ({
-    success: true,
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-  }))
+  .get("/", () => {
+    return {
+      success: true,
+      message: "Blotter API is running! 🚀",
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        swagger: "/swagger",
+        auth: "/api/auth",
+        reports: "/api/reports",
+        users: "/api/users",
+        officers: "/api/officers",
+        witnesses: "/api/witnesses",
+        suspects: "/api/suspects",
+      },
+    };
+  })
+  .get("/health", () => {
+    return {
+      success: true,
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+    };
+  })
   // Mount routes
   .group("/api", (app) =>
     app
