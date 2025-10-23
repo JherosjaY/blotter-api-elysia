@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
-import { apiReference } from "@scalar/elysia-api-reference";
 
 // Import routes
 import { authRoutes } from "./routes/auth";
@@ -19,18 +18,14 @@ export const app = new Elysia()
   )
   .use(
     swagger({
+      path: "/swagger",
       documentation: {
         info: {
           title: "Blotter Management System API",
           version: "1.0.0",
+          description: "API for Blotter Management System",
         },
       },
-    })
-  )
-  .use(
-    apiReference({
-      theme: "purple",
-      pageTitle: "Blotter API Documentation",
     })
   )
   // Health check
@@ -39,7 +34,6 @@ export const app = new Elysia()
     message: "Blotter API is running!",
     timestamp: new Date().toISOString(),
     endpoints: {
-      docs: "/reference",
       swagger: "/swagger",
       auth: "/api/auth",
       reports: "/api/reports",
