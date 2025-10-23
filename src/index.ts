@@ -2,7 +2,6 @@ import { Elysia } from "elysia";
 import { bearer } from "@elysiajs/bearer";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
-import { autoload } from "elysia-autoload";
 
 // Import routes
 import { authRoutes } from "./routes/auth";
