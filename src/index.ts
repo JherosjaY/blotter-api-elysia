@@ -39,10 +39,11 @@ export const app = new Elysia()
     })
   )
   // Health check
-  .get("/", () => {
-    return {
+  .get("/", ({ set }) => {
+    set.headers['content-type'] = 'application/json';
+    return JSON.stringify({
       success: true,
-      message: "Blotter API is running! 🚀",
+      message: "Blotter API is running!",
       timestamp: new Date().toISOString(),
       endpoints: {
         swagger: "/swagger",
@@ -53,14 +54,15 @@ export const app = new Elysia()
         witnesses: "/api/witnesses",
         suspects: "/api/suspects",
       },
-    };
+    });
   })
-  .get("/health", () => {
-    return {
+  .get("/health", ({ set }) => {
+    set.headers['content-type'] = 'application/json';
+    return JSON.stringify({
       success: true,
       status: "healthy",
       timestamp: new Date().toISOString(),
-    };
+    });
   })
   // Mount routes
   .group("/api", (app) =>
