@@ -13,6 +13,8 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").default(true),
   profileCompleted: boolean("profile_completed").default(false),
   mustChangePassword: boolean("must_change_password").default(false),
+  fcmToken: text("fcm_token"), // Firebase Cloud Messaging token
+  deviceId: varchar("device_id", { length: 255 }), // Device identifier
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

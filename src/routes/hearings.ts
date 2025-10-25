@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { hearings } from "../db/schema";
+import { hearings, blotterReports } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
+import FCM from "../../backend-fcm-helper.js";
 
 export const hearingsRoutes = new Elysia({ prefix: "/hearings" })
   // Get all hearings
@@ -59,6 +60,43 @@ export const hearingsRoutes = new Elysia({ prefix: "/hearings" })
           createdAt: new Date(),
         })
         .returning();
+
+      // Send notification about hearing scheduled
+      try {
+        const report = await db.query.blotterReports.findFirst({
+          where: eq(blotterReports.id, body.blotterReportId),
+        });
+
+        if (report) {
+          // Notify complainant
+          if (report.filedById) {
+            await FCM.notifyUserHearingScheduled(
+              db,
+              report.filedById,
+              report.caseNumber,
+              body.hearingDate,
+              body.location,
+              body.hearingTime
+            );
+          }
+
+          // Notify assigned officer
+          if (report.assignedOfficerIds) {
+            const officerIds = report.assignedOfficerIds.split(',').map(id => parseInt(id.trim()));
+            for (const officerId of officerIds) {
+              await FCM.notifyOfficerHearingScheduled(
+                db,
+                officerId,
+                report.caseNumber,
+                body.hearingDate,
+                body.location
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to send notification:", error);
+      }
 
       return {
         success: true,

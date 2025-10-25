@@ -164,6 +164,29 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     }
   })
 
+  // Mark All Notifications as Read for a User
+  .patch("/read-all/:userId", async ({ params }) => {
+    try {
+      const userId = parseInt(params.userId);
+
+      await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(eq(notifications.userId, userId));
+
+      return {
+        success: true,
+        message: "All notifications marked as read",
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to mark all notifications as read",
+        error: error.message,
+      };
+    }
+  })
+
   // Upload Audio Recording
   .post("/audio/:reportId", async ({ params, body }) => {
     try {

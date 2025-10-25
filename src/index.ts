@@ -1,6 +1,10 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
+import FCM from "../backend-fcm-helper.js";
+
+// Initialize Firebase Cloud Messaging
+FCM.initializeFCM();
 
 // Import routes
 import { authRoutes } from "./routes/auth";
