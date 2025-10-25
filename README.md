@@ -8,62 +8,52 @@ Backend API built with **Elysia.js** (Bun framework) and **Drizzle ORM** (Postgr
 - 🗄️ **Drizzle ORM** - Type-safe SQL ORM
 - 🐘 **PostgreSQL** - Robust relational database
 - 📚 **Swagger UI** - Auto-generated API documentation
-- 🐳 **Docker** - Containerized deployment
 - 🔒 **CORS** - Cross-origin resource sharing
 - 🔑 **Bearer Auth** - Token-based authentication
 
 ## 📋 Prerequisites
 
-- [Bun](https://bun.sh/) >= 1.0.0
-- [PostgreSQL](https://www.postgresql.org/) >= 14
-- [Docker](https://www.docker.com/) (optional)
+- [Bun](https://bun.sh) installed
+- PostgreSQL database (local or cloud)
 
-## 🛠️ Installation
+## 🚀 Quick Start
 
-### 1. Install dependencies
+### Prerequisites
+- [Bun](https://bun.sh) installed
+- PostgreSQL database (local or cloud)
 
+### Installation
+
+1. **Install dependencies:**
 ```bash
 bun install
 ```
 
-### 2. Setup environment variables
-
+2. **Configure environment variables:**
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your database credentials:
-
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/blotter_db
 PORT=3000
 NODE_ENV=development
 JWT_SECRET=your-secret-key
+ALLOWED_ORIGINS=http://localhost:3000,http://10.0.2.2:3000
 ```
 
-### 3. Setup database
-
-Start PostgreSQL (or use Docker):
-
+3. **Push database schema:**
 ```bash
-# Using Docker Compose (recommended for development)
-docker-compose -f docker-compose.dev.yml up -d
-```
-
-Generate and run migrations:
-
-```bash
-bun run db:generate
 bun run db:push
 ```
 
-### 4. Start development server
-
+4. **Start development server:**
 ```bash
 bun run dev
 ```
 
-The API will be available at `http://localhost:3000`
+Server will start at: `http://localhost:3000`
 
 ## 📚 API Documentation
 

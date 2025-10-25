@@ -29,12 +29,14 @@ export const blotterReports = pgTable("blotter_reports", {
   complainantName: varchar("complainant_name", { length: 200 }),
   complainantContact: varchar("complainant_contact", { length: 50 }),
   complainantAddress: text("complainant_address"),
+  complainantEmail: varchar("complainant_email", { length: 100 }),
   status: varchar("status", { length: 50 }).notNull().default("Pending"),
   priority: varchar("priority", { length: 20 }).default("Normal"),
   assignedOfficer: varchar("assigned_officer", { length: 200 }),
   assignedOfficerIds: text("assigned_officer_ids"),
   filedBy: varchar("filed_by", { length: 200 }),
   filedById: integer("filed_by_id"),
+  audioRecordingUri: text("audio_recording_uri"),
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -134,4 +136,74 @@ export const notifications = pgTable("notifications", {
   caseId: integer("case_id"),
   isRead: boolean("is_read").default(false),
   timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Persons Table
+export const persons = pgTable("persons", {
+  id: serial("id").primaryKey(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  middleName: varchar("middle_name", { length: 100 }),
+  contactNumber: varchar("contact_number", { length: 50 }),
+  address: text("address"),
+  personType: varchar("person_type", { length: 50 }).notNull(), // Complainant, Witness, Suspect, Respondent
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Person History Table (tracks person involvement in cases)
+export const personHistory = pgTable("person_history", {
+  id: serial("id").primaryKey(),
+  personId: integer("person_id").notNull(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  role: varchar("role", { length: 50 }).notNull(), // Complainant, Witness, Suspect, Respondent
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Respondents Table
+export const respondents = pgTable("respondents", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  age: integer("age"),
+  address: text("address"),
+  contactNumber: varchar("contact_number", { length: 50 }),
+  cooperationStatus: varchar("cooperation_status", { length: 50 }).default("Notified"), // Appeared, Notified, No Response
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Respondent Statements Table
+export const respondentStatements = pgTable("respondent_statements", {
+  id: serial("id").primaryKey(),
+  respondentId: integer("respondent_id").notNull(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  statement: text("statement").notNull(),
+  dateGiven: varchar("date_given", { length: 50 }),
+  takenBy: varchar("taken_by", { length: 200 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// SMS Notifications Table
+export const smsNotifications = pgTable("sms_notifications", {
+  id: serial("id").primaryKey(),
+  recipientName: varchar("recipient_name", { length: 200 }).notNull(),
+  recipientNumber: varchar("recipient_number", { length: 50 }).notNull(),
+  message: text("message").notNull(),
+  messageType: varchar("message_type", { length: 50 }).notNull(), // Hearing, Status Update, etc.
+  blotterReportId: integer("blotter_report_id"),
+  deliveryStatus: varchar("delivery_status", { length: 50 }).default("Pending"), // Pending, Sent, Failed
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Case Templates Table
+export const caseTemplates = pgTable("case_templates", {
+  id: serial("id").primaryKey(),
+  templateName: varchar("template_name", { length: 200 }).notNull(),
+  incidentType: varchar("incident_type", { length: 100 }).notNull(),
+  templateContent: text("template_content").notNull(),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });

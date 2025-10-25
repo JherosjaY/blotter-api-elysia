@@ -9,6 +9,13 @@ import { usersRoutes } from "./routes/users";
 import { officersRoutes } from "./routes/officers";
 import { witnessesRoutes } from "./routes/witnesses";
 import { suspectsRoutes } from "./routes/suspects";
+import { dashboardRoutes } from "./routes/dashboard";
+import { personsRoutes } from "./routes/persons";
+import { evidenceRoutes } from "./routes/evidence";
+import { hearingsRoutes } from "./routes/hearings";
+import { resolutionsRoutes } from "./routes/resolutions";
+import { activityLogsRoutes } from "./routes/activityLogs";
+import { notificationsRoutes } from "./routes/notifications";
 
 export const app = new Elysia()
   .use(
@@ -41,6 +48,13 @@ export const app = new Elysia()
       officers: "/api/officers",
       witnesses: "/api/witnesses",
       suspects: "/api/suspects",
+      dashboard: "/api/dashboard",
+      persons: "/api/persons",
+      evidence: "/api/evidence",
+      hearings: "/api/hearings",
+      resolutions: "/api/resolutions",
+      activityLogs: "/api/activity-logs",
+      notifications: "/api/notifications",
     },
   }))
   .get("/health", () => ({
@@ -57,6 +71,13 @@ export const app = new Elysia()
       .use(officersRoutes)
       .use(witnessesRoutes)
       .use(suspectsRoutes)
+      .use(dashboardRoutes)
+      .use(personsRoutes)
+      .use(evidenceRoutes)
+      .use(hearingsRoutes)
+      .use(resolutionsRoutes)
+      .use(activityLogsRoutes)
+      .use(notificationsRoutes)
   )
   .listen(process.env.PORT || 3000);
 
