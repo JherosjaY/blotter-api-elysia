@@ -10,13 +10,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.Witness
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +30,7 @@ fun WitnessListScreen(
     viewModel: DashboardViewModel = viewModel()
 ) {
     val witnesses by viewModel.getWitnessesByReportId(reportId).collectAsState(initial = emptyList())
+    val paginationState = rememberPaginationState(witnesses, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -101,14 +104,16 @@ fun WitnessListScreen(
                 }
             }
         } else {
+            val listState = LazyListOptimizer.rememberOptimizedLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
             ) {
-                items(witnesses) { witness ->
+                items(paginationState.visibleItems) { witness ->
                     WitnessCard(witness)
                 }
             }

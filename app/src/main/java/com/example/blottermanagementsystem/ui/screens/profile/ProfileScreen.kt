@@ -712,7 +712,9 @@ fun ProfileScreen(
             text = {
                 Text(
                     text = "Are you sure you want to logout?",
-                    color = TextSecondary
+                    color = TextSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             },
             confirmButton = {

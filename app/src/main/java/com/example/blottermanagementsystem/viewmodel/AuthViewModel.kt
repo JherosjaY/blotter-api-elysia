@@ -7,12 +7,13 @@ import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.User
 import com.example.blottermanagementsystem.data.entity.ActivityLog
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import com.example.blottermanagementsystem.data.repository.ApiRepository
 import com.example.blottermanagementsystem.utils.PreferencesManager
 import com.example.blottermanagementsystem.utils.SecurityUtils
-import com.example.blottermanagementsystem.data.api.ApiRepository
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 sealed class AuthState {
@@ -45,7 +46,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     private val preferencesManager = PreferencesManager(application)
@@ -59,91 +62,99 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Loading
             
             try {
-                // Try API login first
-                Log.d("AuthViewModel", "Attempting API login for: $username")
+                // ☁️ CLOUD FIRST: Try API login
+                Log.d("AuthViewModel", "🌐 Attempting cloud API login for: $username")
                 val apiResult = apiRepository.login(username, password)
                 
                 apiResult.onSuccess { apiUser ->
-                    Log.d("AuthViewModel", "✅ API Login Success: ${apiUser.firstName} ${apiUser.lastName}")
+                    Log.d("AuthViewModel", "✅ Cloud Login Success: ${apiUser.firstName} ${apiUser.lastName}")
                     
-                    // Save user session from API response
+                    // Save/update user in local database for offline access
+                    val existingUser = repository.getUserByUsername(username)
+                    if (existingUser != null) {
+                        // Update existing user
+                        repository.updateUser(apiUser.copy(id = existingUser.id))
+                    } else {
+                        // Insert new user
+                        repository.insertUser(apiUser)
+                    }
+                    
+                    // Save session with actual role from database
                     preferencesManager.saveUserSession(
-                        userId = apiUser.id.hashCode(), // Convert UUID string to Int
+                        userId = apiUser.id,
                         username = apiUser.username,
                         role = apiUser.role,
                         firstName = apiUser.firstName,
                         lastName = apiUser.lastName,
-                        profilePhoto = apiUser.profilePicture
+                        profilePhoto = apiUser.profilePhotoUri
                     )
                     
-                    // Role-based profile picture logic
+                    // Profile picture logic
                     when (apiUser.role) {
                         "Admin", "Officer" -> {
                             preferencesManager.hasSelectedProfilePicture = true
                         }
                         else -> {
-                            preferencesManager.hasSelectedProfilePicture = true // Set to true for now
+                            if (!apiUser.profileCompleted) {
+                                preferencesManager.hasSelectedProfilePicture = false
+                            }
                         }
                     }
                     
-                    // Create User entity for AuthState
-                    val user = User(
-                        id = apiUser.id.hashCode(),
-                        firstName = apiUser.firstName,
-                        lastName = apiUser.lastName,
-                        username = apiUser.username,
-                        password = "", // Don't store password
-                        role = apiUser.role,
-                        profileCompleted = true
-                    )
+                    _authState.value = AuthState.Success(apiUser)
+                    return@launch
+                }
+                
+                // ⚠️ API FAILED: Fallback to local database
+                apiResult.onFailure { apiError ->
+                    Log.w("AuthViewModel", "⚠️ Cloud login failed: ${apiError.message}")
+                    Log.d("AuthViewModel", "📱 Falling back to local database...")
                     
-                    _authState.value = AuthState.Success(user)
-                    return@launch
-                }
-                
-                // If API login fails, try Room database as fallback
-                Log.w("AuthViewModel", "API login failed, trying Room database")
-                val user = repository.getUserByUsername(username)
-                
-                if (user == null) {
-                    _authState.value = AuthState.Error("User not found")
-                    return@launch
-                }
-                
-                if (!SecurityUtils.verifyPassword(password, user.password)) {
-                    _authState.value = AuthState.Error("Incorrect username or password")
-                    return@launch
-                }
-                
-                // Auto-detect role based on username prefix
-                val actualRole = when {
-                    username.startsWith("off.", ignoreCase = true) -> "Officer"
-                    else -> user.role
-                }
-                
-                // Save user session
-                preferencesManager.saveUserSession(
-                    userId = user.id,
-                    username = user.username,
-                    role = actualRole,
-                    firstName = user.firstName,
-                    lastName = user.lastName,
-                    profilePhoto = user.profilePhotoUri
-                )
-                
-                // Role-based profile picture logic
-                when (actualRole) {
-                    "Admin", "Officer" -> {
-                        preferencesManager.hasSelectedProfilePicture = true
-                    }
-                    else -> {
-                        if (!user.profileCompleted) {
-                            preferencesManager.hasSelectedProfilePicture = false
+                    val localUser = repository.getUserByUsername(username)
+                    
+                    if (localUser != null) {
+                        // Verify password
+                        val passwordMatches = if (SecurityUtils.isPasswordHashed(localUser.password)) {
+                            SecurityUtils.verifyPassword(password, localUser.password)
+                        } else {
+                            localUser.password == password
                         }
+                        
+                        if (passwordMatches) {
+                            Log.d("AuthViewModel", "✅ Local Login Success: ${localUser.firstName} ${localUser.lastName}")
+                            
+                            // Use actual role from database, no auto-detection
+                            preferencesManager.saveUserSession(
+                                userId = localUser.id,
+                                username = localUser.username,
+                                role = localUser.role,
+                                firstName = localUser.firstName,
+                                lastName = localUser.lastName,
+                                profilePhoto = localUser.profilePhotoUri
+                            )
+                            
+                            when (localUser.role) {
+                                "Admin", "Officer" -> {
+                                    preferencesManager.hasSelectedProfilePicture = true
+                                }
+                                else -> {
+                                    if (!localUser.profileCompleted) {
+                                        preferencesManager.hasSelectedProfilePicture = false
+                                    }
+                                }
+                            }
+                            
+                            _authState.value = AuthState.Success(localUser)
+                            return@launch
+                        } else {
+                            _authState.value = AuthState.Error("Incorrect username or password")
+                            return@launch
+                        }
+                    } else {
+                        _authState.value = AuthState.Error("User not found. Please check your internet connection.")
+                        return@launch
                     }
                 }
-                
-                _authState.value = AuthState.Success(user.copy(role = actualRole))
             } catch (e: Exception) {
                 Log.e("AuthViewModel", "Login error: ${e.message}", e)
                 _authState.value = AuthState.Error(e.message ?: "Login failed")
@@ -162,35 +173,54 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Loading
             
             try {
-                // Check if username already exists
-                val existingUser = repository.getUserByUsername(username)
-                if (existingUser != null) {
-                    _authState.value = AuthState.Error("Username already exists")
+                // ☁️ CLOUD FIRST: Try API registration
+                Log.d("AuthViewModel", "🌐 Attempting cloud API registration for: $username")
+                val apiResult = apiRepository.register(username, password, firstName, lastName, role)
+                
+                apiResult.onSuccess { apiUser ->
+                    Log.d("AuthViewModel", "✅ Cloud Registration Success: ${apiUser.firstName} ${apiUser.lastName}")
+                    
+                    // Save to local database
+                    repository.insertUser(apiUser)
+                    
+                    preferencesManager.hasSelectedProfilePicture = false
+                    _authState.value = AuthState.Success(apiUser)
                     return@launch
                 }
                 
-                // Hash password
-                val hashedPassword = SecurityUtils.hashPassword(password)
-                
-                // Create new user
-                val newUser = User(
-                    firstName = firstName,
-                    lastName = lastName,
-                    username = username,
-                    password = hashedPassword,
-                    role = role,
-                    profileCompleted = false
-                )
-                
-                val userId = repository.insertUser(newUser)
-                
-                // Don't auto-login after registration
-                // User must login manually, then select profile picture
-                // Make sure profile selection flag is reset for new users
-                preferencesManager.hasSelectedProfilePicture = false
-                
-                _authState.value = AuthState.Success(newUser.copy(id = userId.toInt()))
+                // ⚠️ API FAILED: Fallback to local registration
+                apiResult.onFailure { apiError ->
+                    Log.w("AuthViewModel", "⚠️ Cloud registration failed: ${apiError.message}")
+                    Log.d("AuthViewModel", "📱 Falling back to local registration...")
+                    
+                    // Check if username already exists locally
+                    val existingUser = repository.getUserByUsername(username)
+                    if (existingUser != null) {
+                        _authState.value = AuthState.Error("Username already exists")
+                        return@launch
+                    }
+                    
+                    // Hash password
+                    val hashedPassword = SecurityUtils.hashPassword(password)
+                    
+                    // Save to local Room database
+                    Log.d("AuthViewModel", "Registering user locally...")
+                    val newUser = User(
+                        firstName = firstName,
+                        lastName = lastName,
+                        username = username,
+                        password = hashedPassword,
+                        role = role,
+                        profileCompleted = false
+                    )
+                    
+                    val userId = repository.insertUser(newUser)
+                    
+                    preferencesManager.hasSelectedProfilePicture = false
+                    _authState.value = AuthState.Success(newUser.copy(id = userId.toInt()))
+                }
             } catch (e: Exception) {
+                Log.e("AuthViewModel", "Registration error", e)
                 _authState.value = AuthState.Error(e.message ?: "Registration failed")
             }
         }
@@ -263,30 +293,45 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         return try {
             val user = repository.getUserById(userId) ?: return false
             
-            // Get all reports created by this user
-            repository.getReportsByUser(userId).collect { userReports ->
-                // Delete all related data for each report
-                userReports.forEach { report ->
-                    // Delete witnesses, suspects, evidence, hearings, status history
-                    repository.deleteWitnessesByReportId(report.id)
-                    repository.deleteSuspectsByReportId(report.id)
-                    repository.deleteEvidenceByReportId(report.id)
-                    repository.deleteHearingsByReportId(report.id)
-                    repository.deleteStatusHistoryByReportId(report.id)
-                    
-                    // Delete the report itself
-                    repository.deleteReport(report)
+            // ⚡ Try API first (delete from cloud)
+            try {
+                Log.d("AuthViewModel", "🌐 Deleting user account from API...")
+                val apiResult = apiRepository.deleteUser(userId)
+                
+                apiResult.onSuccess {
+                    Log.d("AuthViewModel", "✅ User deleted from cloud successfully")
+                }.onFailure { error ->
+                    Log.w("AuthViewModel", "⚠️ API deletion failed: ${error.message}")
                 }
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "⚠️ API deletion error: ${e.message}")
+            }
+            
+            // Get all reports created by this user
+            val userReports = repository.getReportsByUser(userId).first()
+            
+            // Delete all related data for each report
+            userReports.forEach { report ->
+                // Delete witnesses, suspects, evidence, hearings, status history
+                repository.deleteWitnessesByReportId(report.id)
+                repository.deleteSuspectsByReportId(report.id)
+                repository.deleteEvidenceByReportId(report.id)
+                repository.deleteHearingsByReportId(report.id)
+                repository.deleteStatusHistoryByReportId(report.id)
+                
+                // Delete the report itself
+                repository.deleteReport(report)
             }
             
             // Delete all user notifications
             repository.deleteAllNotificationsByUserId(userId)
             
-            // Finally, delete the user
+            // Finally, delete the user from local database
             repository.deleteUser(user)
             
             true
         } catch (e: Exception) {
+            Log.e("AuthViewModel", "Delete account error", e)
             false
         }
     }
@@ -365,3 +410,4 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+

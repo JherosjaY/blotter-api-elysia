@@ -153,6 +153,7 @@ fun AddReportScreen(
     var respondentAlias by remember { mutableStateOf("") }
     var respondentAddress by remember { mutableStateOf("") }
     var respondentContact by remember { mutableStateOf("") }
+    var respondentContactError by remember { mutableStateOf<String?>(null) }
     var accusation by remember { mutableStateOf("") }
     var relationshipToComplainant by remember { mutableStateOf("") }
     
@@ -236,7 +237,7 @@ fun AddReportScreen(
                 val photoFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
                 val uri = androidx.core.content.FileProvider.getUriForFile(
                     context,
-                    "${context.packageName}.fileprovider",
+                    "${context.packageName}.provider",
                     photoFile
                 )
                 tempPhotoUri.value = uri
@@ -288,10 +289,12 @@ fun AddReportScreen(
         }
     }
     
-    // Phone validation function
+    // Phone validation function - Supports both 09 and +63 formats
     fun validatePhoneNumber(phone: String): Boolean {
-        val pattern = "^09\\d{9}$".toRegex()
-        return pattern.matches(phone)
+        val pattern09 = "^09\\d{9}$".toRegex()  // 09XXXXXXXXX (11 digits)
+        val pattern63 = "^\\+639\\d{9}$".toRegex()  // +639XXXXXXXXX (13 chars)
+        val pattern639 = "^639\\d{9}$".toRegex()  // 639XXXXXXXXX (12 digits)
+        return pattern09.matches(phone) || pattern63.matches(phone) || pattern639.matches(phone)
     }
 
     Scaffold(
@@ -373,7 +376,12 @@ fun AddReportScreen(
                 onValueChange = { 
                     contactNumber = it
                     contactError = if (it.isNotBlank() && !validatePhoneNumber(it)) {
-                        "Format: 09XXXXXXXXX (11 digits)"
+                        when {
+                            !it.startsWith("09") -> "Must start with 09"
+                            it.length < 11 -> "Need ${11 - it.length} more digit(s)"
+                            it.length > 11 -> "Too long (max 11 digits)"
+                            else -> "Invalid format"
+                        }
                     } else null
                 },
                 label = { Text("Contact Number") },
@@ -390,7 +398,7 @@ fun AddReportScreen(
                         )
                     } else {
                         Text(
-                            text = "Format: 09XXXXXXXXX",
+                            text = "Format: 09XXXXXXXXX (11 digits)",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -711,24 +719,56 @@ fun AddReportScreen(
             
             OutlinedTextField(
                 value = respondentContact,
-                onValueChange = { respondentContact = it },
+                onValueChange = { 
+                    respondentContact = it
+                    respondentContactError = if (it.isNotBlank() && !validatePhoneNumber(it)) {
+                        when {
+                            !it.startsWith("09") -> "Must start with 09"
+                            it.length < 11 -> "Need ${11 - it.length} more digit(s)"
+                            it.length > 11 -> "Too long (max 11 digits)"
+                            else -> "Invalid format"
+                        }
+                    } else null
+                },
                 label = { Text("Respondent Contact (Optional)") },
                 leadingIcon = { Icon(Icons.Default.Phone, null, tint = WarningOrange) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("09XXXXXXXXX (optional)") },
+                placeholder = { Text("09XXXXXXXXX") },
+                isError = respondentContactError != null,
+                supportingText = {
+                    if (respondentContactError != null) {
+                        Text(
+                            text = respondentContactError!!,
+                            color = ErrorRed,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Format: 09XXXXXXXXX (11 digits)",
+                            fontSize = 12.sp
+                        )
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = ElectricBlue,
                     unfocusedBorderColor = DividerColor,
-                    cursorColor = ElectricBlue
+                    cursorColor = ElectricBlue,
+                    errorBorderColor = ErrorRed
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
             )
             
             // Accusation
             OutlinedTextField(
                 value = accusation,
-                onValueChange = { accusation = it },
+                onValueChange = { newValue ->
+                    // Capitalize first letter
+                    accusation = newValue.replaceFirstChar { 
+                        if (it.isLowerCase()) it.titlecase() else it.toString() 
+                    }
+                },
                 label = { Text("Accusation") },
                 leadingIcon = { Icon(Icons.Default.Warning, null, tint = WarningOrange) },
                 isError = showErrors && accusation.isBlank(),
@@ -1238,8 +1278,6 @@ fun AddReportScreen(
                     Text("Save Report", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
         } // End Column
     } // End Scaffold
     

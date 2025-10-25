@@ -276,7 +276,12 @@ fun EditReportScreen(
                 onValueChange = { 
                     contactNumber = it
                     contactError = if (it.isNotBlank() && !validatePhoneNumber(it)) {
-                        "Format: 09XXXXXXXXX (11 digits)"
+                        when {
+                            !it.startsWith("09") -> "Must start with 09"
+                            it.length < 11 -> "Need ${11 - it.length} more digit(s)"
+                            it.length > 11 -> "Too long (max 11 digits)"
+                            else -> "Invalid format"
+                        }
                     } else null
                 },
                 label = { Text("Contact Number") },
@@ -293,7 +298,7 @@ fun EditReportScreen(
                         )
                     } else {
                         Text(
-                            text = "Format: 09XXXXXXXXX",
+                            text = "Format: 09XXXXXXXXX (11 digits)",
                             fontSize = 12.sp
                         )
                     }
@@ -671,8 +676,6 @@ fun EditReportScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Update Report", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
     

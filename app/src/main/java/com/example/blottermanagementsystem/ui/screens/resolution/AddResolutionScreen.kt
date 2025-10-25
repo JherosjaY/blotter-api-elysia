@@ -27,8 +27,7 @@ fun AddResolutionScreen(
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
     caseNumber: String = "",
-    viewModel: DashboardViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
@@ -210,7 +209,7 @@ fun AddResolutionScreen(
                                     viewModel.addResolution(resolution, currentUserName, caseNumber)
                                     
                                     // Update report status to Resolved
-                                    adminViewModel.updateReportStatus(
+                                    viewModel.updateReportStatus(
                                         reportId, 
                                         "Resolved", 
                                         "Case closed: $resolutionType", 

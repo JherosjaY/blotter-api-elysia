@@ -3,8 +3,11 @@ package com.example.blottermanagementsystem.ui.screens.profile
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,8 +23,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -67,56 +72,92 @@ fun ProfilePictureSelectionScreen(
         "🧙‍♂️", "🧙‍♀️", "🧑‍🎓", "👨‍🎓", "👩‍🎓", "🧑‍⚕️"
     )
 
-    Column(
+    // Entry animation
+    var startAnimation by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        startAnimation = true
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkNavy)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0f172a),
+                        Color(0xFF1e293b)
+                    )
+                )
+            )
     ) {
-        Spacer(modifier = Modifier.height(40.dp))
-        
-        // Title
-        Text(
-            text = "Choose Your Avatar",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = "Select an emoji to represent your profile",
-            fontSize = 14.sp,
-            color = TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        
-        Spacer(modifier = Modifier.height(40.dp))
-        
-        // Preview with bounce animation
-        val infiniteTransition = rememberInfiniteTransition(label = "bounce")
-        val scale by infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "scale"
-        )
-        
+        // Background blur circles
         Box(
             modifier = Modifier
-                .size(120.dp)
-                .scale(scale)
-                .clip(CircleShape)
-                .background(Color.White)
-                .border(3.dp, ElectricBlue, CircleShape)
-                .clickable { imagePickerLauncher.launch("image/*") },
-            contentAlignment = Alignment.Center
+                .size(250.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 80.dp, y = (-50).dp)
+                .blur(70.dp)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            ElectricBlue.copy(alpha = 0.3f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = CircleShape
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(40.dp))
+        
+            // Title with animation
+            AnimatedVisibility(
+                visible = startAnimation,
+                enter = fadeIn(tween(600)) + slideInVertically(tween(600))
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Choose Your Avatar",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Select an emoji to represent your profile",
+                        fontSize = 14.sp,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        
+        Spacer(modifier = Modifier.height(40.dp))
+        
+            // Preview - removed bounce animation for performance
+        
+            AnimatedVisibility(
+                visible = startAnimation,
+                enter = fadeIn(tween(800)) + slideInVertically(tween(800))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(4.dp, ElectricBlue, CircleShape)
+                        .clickable { imagePickerLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
             if (selectedImageUri != null) {
                 Image(
                     painter = rememberAsyncImagePainter(selectedImageUri),
@@ -124,13 +165,14 @@ fun ProfilePictureSelectionScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-            } else {
-                Text(
-                    text = selectedEmoji,
-                    fontSize = 64.sp
-                )
+                } else {
+                    Text(
+                        text = selectedEmoji,
+                        fontSize = 72.sp
+                    )
+                }
+                }
             }
-        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
@@ -164,48 +206,72 @@ fun ProfilePictureSelectionScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Grid of emoji options
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = CardBackground
-            )
-        ) {
+            // Grid of emoji options with glassmorphism
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1e293b).copy(alpha = 0.7f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(emojiOptions) { emoji ->
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selectedEmoji == emoji && selectedImageUri == null) ElectricBlue.copy(alpha = 0.3f)
-                                else SurfaceDark
-                            )
-                            .border(
-                                width = if (selectedEmoji == emoji && selectedImageUri == null) 2.dp else 0.dp,
-                                color = ElectricBlue,
-                                shape = CircleShape
-                            )
-                            .clickable { 
-                                selectedEmoji = emoji
-                                selectedImageUri = null
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = emoji,
-                            fontSize = 32.sp
+                    items(emojiOptions) { emoji ->
+                        val isSelected = selectedEmoji == emoji && selectedImageUri == null
+                        val scale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.1f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "emojiScale"
                         )
+                        
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .scale(scale)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) 
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                ElectricBlue.copy(alpha = 0.4f),
+                                                InfoBlue.copy(alpha = 0.4f)
+                                            )
+                                        )
+                                    else 
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                Color(0xFF334155),
+                                                Color(0xFF1e293b)
+                                            )
+                                        )
+                                )
+                                .border(
+                                    width = if (isSelected) 3.dp else 0.dp,
+                                    color = ElectricBlue,
+                                    shape = CircleShape
+                                )
+                                .clickable { 
+                                    selectedEmoji = emoji
+                                    selectedImageUri = null
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = emoji,
+                                fontSize = 32.sp
+                            )
+                        }
                     }
-                }
             }
         }
         
@@ -251,6 +317,7 @@ fun ProfilePictureSelectionScreen(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }

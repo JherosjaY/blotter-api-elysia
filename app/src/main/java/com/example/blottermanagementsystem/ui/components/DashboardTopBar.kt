@@ -103,25 +103,28 @@ fun DashboardTopBar(
                 }
                 
                 // Notifications (moved second)
-                Box {
+                BadgedBox(
+                    badge = {
+                        if (notificationCount > 0) {
+                            Badge(
+                                containerColor = DangerRed,
+                                contentColor = androidx.compose.ui.graphics.Color.White
+                            ) {
+                                Text(
+                                    text = if (notificationCount > 99) "99+" else notificationCount.toString(),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                ) {
                     IconButton(onClick = onNavigateToNotifications) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
+                            imageVector = if (notificationCount > 0) Icons.Default.NotificationsActive else Icons.Default.Notifications,
                             contentDescription = "Notifications",
-                            tint = ElectricBlue
+                            tint = if (notificationCount > 0) DangerRed else ElectricBlue
                         )
-                    }
-                    if (notificationCount > 0) {
-                        Badge(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-4).dp, y = 8.dp)
-                        ) {
-                            Text(
-                                text = notificationCount.toString(),
-                                fontSize = 10.sp
-                            )
-                        }
                     }
                 }
             }

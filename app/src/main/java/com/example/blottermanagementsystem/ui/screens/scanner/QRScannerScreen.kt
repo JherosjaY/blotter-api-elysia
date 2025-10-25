@@ -45,6 +45,8 @@ fun QRScannerScreen(
             AndroidView(
                 factory = { context ->
                     DecoratedBarcodeView(context).apply {
+                        // Use default viewfinder size and position
+                        
                         decodeContinuous(object : BarcodeCallback {
                             override fun barcodeResult(result: BarcodeResult?) {
                                 result?.text?.let { code ->

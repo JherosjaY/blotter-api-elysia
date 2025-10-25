@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
                                 when (preferencesManager.userRole) {
                                     "Admin" -> Screen.AdminDashboard.route
                                     "Officer" -> Screen.OfficerDashboard.route
-                                    else -> Screen.ClerkDashboard.route
+                                    else -> Screen.UserDashboard.route
                                 }
                             }
                         }
@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
                         val isDashboard = currentRoute in listOf(
                             Screen.AdminDashboard.route,
                             Screen.OfficerDashboard.route,
-                            Screen.ClerkDashboard.route
+                            Screen.UserDashboard.route
                         )
                         
                         // Reset back press after 2 seconds

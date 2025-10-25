@@ -70,7 +70,7 @@ fun KPFormsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = InfoBlue.copy(alpha = 0.1f))
+                colors = CardDefaults.cardColors(containerColor = InfoBlue.copy(alpha = 0.15f))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
@@ -79,13 +79,13 @@ fun KPFormsScreen(
                         "Available KP Forms",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = InfoBlue
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "• KP-7: Notice of Hearing\n• KP-10: Summons\n• KP-16: Amicable Settlement\n• KP-18: Certificate to File Action",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -102,10 +102,10 @@ fun KPFormsScreen(
                             Icons.Default.Description,
                             contentDescription = null,
                             modifier = Modifier.size(64.dp),
-                            tint = Color.Gray
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("No KP forms generated yet", color = Color.Gray, fontSize = 16.sp)
+                        Text("No KP forms generated yet", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
                     }
                 }
             } else {
@@ -133,6 +133,9 @@ fun KPFormsScreen(
 
 @Composable
 fun KPFormCard(form: KPForm) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isGenerating by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
@@ -148,7 +151,7 @@ fun KPFormCard(form: KPForm) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         form.formType,
                         fontSize = 16.sp,
@@ -158,7 +161,7 @@ fun KPFormCard(form: KPForm) {
                     Text(
                         form.formTitle,
                         fontSize = 14.sp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 
@@ -191,20 +194,49 @@ fun KPFormCard(form: KPForm) {
             Text(
                 "Form #: ${form.formNumber}",
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Text(
                 "Issued by: ${form.issuedBy}",
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Text(
                 "Date: ${DateUtils.formatDate(form.issueDate)}",
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            
+            // Download PDF Button
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    isGenerating = true
+                    // TODO: Implement PDF generation
+                    android.widget.Toast.makeText(
+                        context,
+                        "PDF generation coming soon!",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    isGenerating = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                enabled = !isGenerating
+            ) {
+                if (isGenerating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Default.Download, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Download PDF")
+                }
+            }
         }
     }
 }
@@ -251,7 +283,7 @@ fun FormSelectorDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(type, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(title, fontSize = 12.sp, color = Color.Gray)
+                            Text(title, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

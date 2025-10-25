@@ -3,6 +3,7 @@ package com.example.blottermanagementsystem.ui.screens.sms
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,9 +16,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.SmsNotification
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.PreferencesManager
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
+import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
 import com.example.blottermanagementsystem.viewmodel.SmsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,22 +33,67 @@ import java.util.*
 fun SmsNotificationListScreen(
     reportId: Int? = null,
     onNavigateBack: () -> Unit,
-    viewModel: SmsViewModel = viewModel()
+    viewModel: SmsViewModel = viewModel(),
+    dashboardViewModel: DashboardViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val preferencesManager = remember { PreferencesManager(context) }
+    val userRole = preferencesManager.userRole ?: "User"
+    val userId = preferencesManager.userId
+    
+    // Get all reports for filtering
+    val allReports by dashboardViewModel.allReports.collectAsState(initial = emptyList())
+    
     val notifications by if (reportId != null) {
         viewModel.getNotificationsByReportId(reportId).collectAsState(initial = emptyList())
     } else {
         viewModel.getAllNotifications().collectAsState(initial = emptyList())
     }
     
-    var filterStatus by remember { mutableStateOf("All") }
-    val statusOptions = listOf("All", "Pending", "Sent", "Delivered", "Failed", "Replied")
-    
-    val filteredNotifications = if (filterStatus == "All") {
-        notifications
-    } else {
-        notifications.filter { it.deliveryStatus == filterStatus }
+    // Filter notifications based on role
+    val roleFilteredNotifications = when (userRole) {
+        "Officer" -> {
+            // Officers only see SMS for their assigned cases
+            val assignedReportIds = allReports
+                .filter { report ->
+                    val assignedOfficerIds = report.assignedOfficerIds
+                        .split(",")
+                        .mapNotNull { it.trim().toIntOrNull() }
+                    assignedOfficerIds.contains(userId)
+                }
+                .map { it.id }
+            
+            notifications.filter { notification ->
+                assignedReportIds.contains(notification.blotterReportId)
+            }
+        }
+        "Admin" -> {
+            // Admins see all SMS
+            notifications
+        }
+        else -> {
+            // Users see SMS for their own reports
+            val userReportIds = allReports
+                .filter { it.userId == userId }
+                .map { it.id }
+            
+            notifications.filter { notification ->
+                userReportIds.contains(notification.blotterReportId)
+            }
+        }
     }
+    
+    var filterStatus by remember { mutableStateOf("All") }
+    val statusOptions = listOf("All", "Pending", "Sent", "Delivered")
+    
+    val filteredNotifications = remember(roleFilteredNotifications, filterStatus) {
+        if (filterStatus == "All") {
+            roleFilteredNotifications
+        } else {
+            roleFilteredNotifications.filter { it.deliveryStatus == filterStatus }
+        }
+    }
+    val paginationState = rememberPaginationState(filteredNotifications, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -74,21 +125,33 @@ fun SmsNotificationListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Filter Chips
-            Row(
+            // Filter Chips - Scrollable
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                statusOptions.forEach { status ->
+                items(statusOptions.size) { index ->
+                    val status = statusOptions[index]
                     FilterChip(
                         selected = filterStatus == status,
                         onClick = { filterStatus = status },
-                        label = { Text(status) },
+                        label = { Text(status, fontSize = 13.sp) },
+                        leadingIcon = {
+                            if (filterStatus == status) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = ElectricBlue,
-                            selectedLabelColor = Color.White
+                            selectedLabelColor = Color.White,
+                            containerColor = CardBackground,
+                            labelColor = Color.Gray
                         )
                     )
                 }
@@ -120,13 +183,23 @@ fun SmsNotificationListScreen(
                     }
                 }
             } else {
+                val listState = LazyListOptimizer.rememberOptimizedLazyListState()
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
                 ) {
-                    items(filteredNotifications) { notification ->
-                        SmsNotificationCard(notification)
+                    items(paginationState.visibleItems, key = { it.id }) { notification ->
+                        SmsNotificationCard(
+                            notification = notification,
+                            onResend = {
+                                viewModel.resendSms(notification.id)
+                            },
+                            onDelete = {
+                                viewModel.deleteSms(notification.id)
+                            }
+                        )
                     }
                 }
             }
@@ -135,7 +208,11 @@ fun SmsNotificationListScreen(
 }
 
 @Composable
-fun SmsNotificationCard(notification: SmsNotification) {
+fun SmsNotificationCard(
+    notification: SmsNotification,
+    onResend: () -> Unit = {},
+    onDelete: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
@@ -151,7 +228,8 @@ fun SmsNotificationCard(notification: SmsNotification) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         when (notification.messageType) {
@@ -167,10 +245,16 @@ fun SmsNotificationCard(notification: SmsNotification) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        notification.messageType.replace("_", " "),
+                        when (notification.messageType) {
+                            "INITIAL_NOTICE" -> "Initial Notice"
+                            "HEARING_NOTICE" -> "Hearing Notice"
+                            "FOLLOW_UP" -> "Follow Up"
+                            "REMINDER" -> "Reminder"
+                            else -> notification.messageType.replace("_", " ")
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 
@@ -193,24 +277,25 @@ fun SmsNotificationCard(notification: SmsNotification) {
                 Text(
                     notification.recipientNumber,
                     fontSize = 14.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
                 )
             }
             
             Spacer(modifier = Modifier.height(8.dp))
             
             // Message Content
-            Card(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = DarkNavy),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
                     notification.messageContent,
                     modifier = Modifier.padding(12.dp),
                     fontSize = 13.sp,
-                    color = Color.White,
-                    lineHeight = 18.sp
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
                 )
             }
             
@@ -235,7 +320,7 @@ fun SmsNotificationCard(notification: SmsNotification) {
                     Text(
                         formatDate(notification.sentDate),
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
@@ -307,6 +392,63 @@ fun SmsNotificationCard(notification: SmsNotification) {
                                 color = Color.Gray
                             )
                         }
+                    }
+                }
+            }
+            
+            // Action Buttons (for Pending or Failed)
+            if (notification.deliveryStatus == "Pending" || notification.deliveryStatus == "Failed") {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = DividerColor.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Resend Button
+                    OutlinedButton(
+                        onClick = onResend,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (notification.deliveryStatus == "Failed") WarningOrange else ElectricBlue
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            2.dp,
+                            if (notification.deliveryStatus == "Failed") WarningOrange else ElectricBlue
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (notification.deliveryStatus == "Failed") "Retry" else "Resend",
+                            fontSize = 13.sp
+                        )
+                    }
+                    
+                    // Delete Button
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = DangerRed
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, DangerRed)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Delete",
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }

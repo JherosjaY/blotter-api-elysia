@@ -7,6 +7,7 @@ import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.Person
 import com.example.blottermanagementsystem.data.entity.PersonHistory
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import android.util.Log
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -33,7 +34,9 @@ class PersonViewModel(application: Application) : AndroidViewModel(application) 
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     val allPersons: Flow<List<Person>> = repository.getAllActivePerson()
@@ -49,20 +52,26 @@ class PersonViewModel(application: Application) : AndroidViewModel(application) 
     
     fun searchPerson(query: String) {
         viewModelScope.launch {
-            repository.searchPerson(query).collect { results ->
-                _searchResults.value = results
+            try {
+                _searchResults.value = repository.searchPerson(query).first()
+            } catch (e: Exception) {
+                Log.e("PersonViewModel", "Error searching person", e)
+                _searchResults.value = emptyList()
             }
         }
     }
     
     fun selectPerson(personId: Int) {
         viewModelScope.launch {
-            val person = repository.getPersonById(personId)
-            _selectedPerson.value = person
-            
-            // Load person history
-            repository.getHistoryByPersonId(personId).collect { history ->
-                _personHistory.value = history
+            try {
+                val person = repository.getPersonById(personId)
+                _selectedPerson.value = person
+                
+                // Load person history - collect ONCE
+                _personHistory.value = repository.getHistoryByPersonId(personId).first()
+            } catch (e: Exception) {
+                Log.e("PersonViewModel", "Error selecting person", e)
+                _personHistory.value = emptyList()
             }
         }
     }

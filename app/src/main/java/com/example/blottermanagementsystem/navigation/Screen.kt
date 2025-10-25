@@ -13,7 +13,7 @@ sealed class Screen(val route: String) {
     object ProfilePictureSelection : Screen("profile_picture_selection")
     object AdminDashboard : Screen("admin_dashboard")
     object OfficerDashboard : Screen("officer_dashboard")
-    object ClerkDashboard : Screen("clerk_dashboard")
+    object UserDashboard : Screen("user_dashboard")
     object Camera : Screen("camera")
     object QRScanner : Screen("qr_scanner")
     object Analytics : Screen("analytics")
@@ -28,6 +28,15 @@ sealed class Screen(val route: String) {
         fun createRoute(reportId: Int, isEditable: Boolean = false) = 
             "report_detail/$reportId?isEditable=$isEditable"
     }
+    object AdminReportDetail : Screen("admin_report_detail/{reportId}") {
+        fun createRoute(reportId: Int) = "admin_report_detail/$reportId"
+    }
+    object OfficerReportDetail : Screen("officer_report_detail/{reportId}") {
+        fun createRoute(reportId: Int) = "officer_report_detail/$reportId"
+    }
+    object UserReportDetail : Screen("user_report_detail/{reportId}") {
+        fun createRoute(reportId: Int) = "user_report_detail/$reportId"
+    }
     object AddReport : Screen("add_report")
     object EditReport : Screen("edit_report/{reportId}") {
         fun createRoute(reportId: Int) = "edit_report/$reportId"
@@ -36,6 +45,7 @@ sealed class Screen(val route: String) {
     object OfficerManagement : Screen("officer_management")
     object ActivityLogs : Screen("activity_logs")
     object AdminReportOversight : Screen("admin_report_oversight")
+    object RecordsArchive : Screen("records_archive")
     object Notifications : Screen("notifications")
     object Profile : Screen("profile")
     object Settings : Screen("settings")
@@ -102,4 +112,22 @@ sealed class Screen(val route: String) {
         fun createRoute(reportId: Int) = "mediation_session/$reportId"
     }
     object BackupRestore : Screen("backup_restore")
+    object CaseTimeline : Screen("case_timeline/{reportId}/{caseNumber}") {
+        fun createRoute(reportId: Int, caseNumber: String) = "case_timeline/$reportId/$caseNumber"
+    }
+    object CaseTemplates : Screen("case_templates")
+    object AdvancedSearch : Screen("advanced_search")
+    object BiometricSetup : Screen("biometric_setup")
+    object HearingCalendar : Screen("hearing_calendar")
+    object PhotoGallery : Screen("photo_gallery/{reportId}") {
+        fun createRoute(reportId: Int) = "photo_gallery/$reportId"
+    }
+    object AdvancedAnalytics : Screen("advanced_analytics")
+    object BulkOperations : Screen("bulk_operations")
+    object EnhancedQR : Screen("enhanced_qr/{reportId}/{caseNumber}") {
+        fun createRoute(reportId: Int, caseNumber: String) = "enhanced_qr/$reportId/$caseNumber"
+    }
+    object IncidentMap : Screen("incident_map")
+    object VoiceToText : Screen("voice_to_text")
+    object SyncSettings : Screen("sync_settings")
 }

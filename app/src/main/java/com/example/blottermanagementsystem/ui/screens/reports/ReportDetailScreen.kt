@@ -21,6 +21,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.utils.PreferencesManager
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberCached
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
 import com.example.blottermanagementsystem.viewmodel.RespondentViewModel
 import com.example.blottermanagementsystem.viewmodel.PersonViewModel
@@ -45,10 +47,10 @@ fun ReportDetailScreen(
     onNavigateToAddHearing: (Int) -> Unit = {},
     onNavigateToAddResolution: (Int) -> Unit = {},
     onNavigateToLegalDocuments: (Int) -> Unit = {},
+    onNavigateToCaseTimeline: (Int, String) -> Unit = { _, _ -> },
     viewModel: DashboardViewModel = viewModel(),
     respondentViewModel: RespondentViewModel = viewModel(),
-    personViewModel: PersonViewModel = viewModel(),
-    adminViewModel: com.example.blottermanagementsystem.viewmodel.AdminViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    personViewModel: PersonViewModel = viewModel()
 ) {
     val allReports by viewModel.allReports.collectAsState(initial = emptyList())
     val report = allReports.find { it.id == reportId }
@@ -57,21 +59,20 @@ fun ReportDetailScreen(
     val respondents by respondentViewModel.getRespondentsByReportId(reportId).collectAsState(initial = emptyList())
     
     // For officer assignment
-    val allOfficers by adminViewModel.allOfficers.collectAsState(initial = emptyList())
+    val allOfficers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
     var showAssignDialog by remember { mutableStateOf(false) }
     var showUpdateStatusDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var assignedOfficerIds by remember { mutableStateOf<List<Int>>(emptyList()) }
     
-    var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
     val currentUserId = preferencesManager.userId ?: 0
     
     // Load assigned officers
     LaunchedEffect(reportId) {
-        assignedOfficerIds = adminViewModel.getAssignedOfficerIds(reportId)
+        assignedOfficerIds = viewModel.getAssignedOfficerIds(reportId)
     }
     
     Scaffold(
@@ -150,7 +151,9 @@ fun ReportDetailScreen(
                 }
             }
         } else {
+            val listState = LazyListOptimizer.rememberOptimizedLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -372,6 +375,28 @@ fun ReportDetailScreen(
                     }
                 }
                 
+                // Case Timeline Button (All roles)
+                if (report != null) {
+                    item {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { onNavigateToCaseTimeline(reportId, report.caseNumber) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = ElectricBlue
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timeline,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("View Case Timeline")
+                        }
+                    }
+                }
+                
                 // Assign Officers Button (Admin only)
                 if (isAdmin && report != null) {
                     item {
@@ -404,7 +429,7 @@ fun ReportDetailScreen(
                         Button(
                             onClick = {
                                 scope.launch {
-                                    adminViewModel.updateReportStatus(
+                                    viewModel.updateReportStatus(
                                         reportId = reportId,
                                         newStatus = "Under Investigation",
                                         notes = "Investigation started by officer",
@@ -1221,12 +1246,12 @@ fun ReportDetailScreen(
         if (showAssignDialog && report != null) {
             com.example.blottermanagementsystem.ui.components.AssignOfficersDialog(
                 caseNumber = report.caseNumber,
-                availableOfficers = allOfficers.filter { it.isAvailable },
+                availableOfficers = allOfficers,
                 currentlyAssignedIds = assignedOfficerIds,
                 onDismiss = { showAssignDialog = false },
                 onAssign = { selectedIds ->
                     scope.launch {
-                        adminViewModel.assignOfficersToCase(reportId, selectedIds)
+                        viewModel.assignOfficersToCase(reportId, selectedIds)
                         assignedOfficerIds = selectedIds
                         showAssignDialog = false
                     }
@@ -1241,7 +1266,7 @@ fun ReportDetailScreen(
                 onDismiss = { showUpdateStatusDialog = false },
                 onUpdateStatus = { newStatus, notes ->
                     scope.launch {
-                        adminViewModel.updateReportStatus(reportId, newStatus, notes, currentUserId)
+                        viewModel.updateReportStatus(reportId, newStatus, notes, currentUserId)
                         showUpdateStatusDialog = false
                     }
                 }

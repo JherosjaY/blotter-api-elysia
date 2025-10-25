@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.SmsNotification
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import android.util.Log
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -32,7 +33,9 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     private val _failedNotificationCount = MutableStateFlow(0)
@@ -74,6 +77,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     suspend fun sendNotification(notification: SmsNotification): Long {
+        // Save to local Room database
         val id = repository.insertSmsNotification(notification)
         loadFailedNotificationCount()
         return id
@@ -95,7 +99,22 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         loadFailedNotificationCount()
     }
     
+    fun resendSms(notificationId: Int) {
+        viewModelScope.launch {
+            repository.updateDeliveryStatus(notificationId, "Pending")
+            loadFailedNotificationCount()
+        }
+    }
+    
+    fun deleteSms(notificationId: Int) {
+        viewModelScope.launch {
+            repository.deleteSmsNotification(notificationId)
+            loadFailedNotificationCount()
+        }
+    }
+    
     fun refreshFailedCount() {
         loadFailedNotificationCount()
     }
 }
+

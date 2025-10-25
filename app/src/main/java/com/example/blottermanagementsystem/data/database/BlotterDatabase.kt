@@ -34,9 +34,11 @@ import java.security.MessageDigest
         RespondentStatement::class,
         Summons::class,
         KPForm::class,
-        MediationSession::class
+        MediationSession::class,
+        CaseTimeline::class,
+        CaseTemplate::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class BlotterDatabase : RoomDatabase() {
@@ -61,6 +63,8 @@ abstract class BlotterDatabase : RoomDatabase() {
     abstract fun summonsDao(): SummonsDao
     abstract fun kpFormDao(): KPFormDao
     abstract fun mediationSessionDao(): MediationSessionDao
+    abstract fun caseTimelineDao(): CaseTimelineDao
+    abstract fun caseTemplateDao(): CaseTemplateDao
     
     companion object {
         @Volatile
@@ -123,6 +127,43 @@ abstract class BlotterDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from version 7 to 8 - Add case timeline and templates
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create case_timeline table
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS case_timeline (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        blotterReportId INTEGER NOT NULL,
+                        eventType TEXT NOT NULL,
+                        eventTitle TEXT NOT NULL,
+                        eventDescription TEXT NOT NULL,
+                        performedBy TEXT NOT NULL,
+                        performedByRole TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        metadata TEXT,
+                        FOREIGN KEY(blotterReportId) REFERENCES blotter_reports(id) ON DELETE CASCADE
+                    )
+                """)
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_case_timeline_blotterReportId ON case_timeline(blotterReportId)")
+                
+                // Create case_templates table
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS case_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        templateName TEXT NOT NULL,
+                        incidentType TEXT NOT NULL,
+                        descriptionTemplate TEXT NOT NULL,
+                        commonQuestions TEXT NOT NULL,
+                        isActive INTEGER NOT NULL DEFAULT 1,
+                        usageCount INTEGER NOT NULL DEFAULT 0,
+                        createdBy TEXT NOT NULL,
+                        createdDate INTEGER NOT NULL
+                    )
+                """)
+            }
+        }
+        
         fun getDatabase(context: Context): BlotterDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -130,7 +171,7 @@ abstract class BlotterDatabase : RoomDatabase() {
                     BlotterDatabase::class.java,
                     "blotter_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration() // For version 3 with new tables
                     .addCallback(DatabaseCallback())
                     .build()

@@ -2,8 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/backend-api" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/backend-api/BlotterManagementSystem" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/backend-api/blotter-api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/backend-elysia" vcs="Git" />
   </component>
 </project>

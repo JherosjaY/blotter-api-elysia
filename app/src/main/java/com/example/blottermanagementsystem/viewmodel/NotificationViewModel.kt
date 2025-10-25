@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.Notification
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -31,11 +32,15 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     // Get notifications for a specific user
     fun getNotificationsByUser(userId: Int): Flow<List<Notification>> {
+        // Note: Notifications are local-only for now (in-app alerts)
+        // They don't need cloud sync as they're generated locally
         return repository.getNotificationsByUserId(userId)
     }
     

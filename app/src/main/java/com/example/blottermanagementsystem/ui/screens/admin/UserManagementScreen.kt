@@ -1,6 +1,7 @@
 package com.example.blottermanagementsystem.ui.screens.admin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,33 +15,46 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.User
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.AdminViewModel
+import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
+import com.example.blottermanagementsystem.utils.rememberDebouncedState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserManagementScreen(
     onNavigateBack: () -> Unit,
-    adminViewModel: AdminViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel()
 ) {
-    val users by adminViewModel.allUsers.collectAsState(initial = emptyList())
+    val users by viewModel.allUsers.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var selectedUser by remember { mutableStateOf<User?>(null) }
     var showDeactivateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     
-    val filteredUsers = users.filter {
-        it.role != "Admin" && // Don't show admins
-        (it.firstName.contains(searchQuery, ignoreCase = true) ||
-         it.lastName.contains(searchQuery, ignoreCase = true) ||
-         it.username.contains(searchQuery, ignoreCase = true))
+    // Optimized: Debounced search for better performance
+    var searchQuery by rememberDebouncedState("", delayMillis = 300)
+    
+    // Optimized: Cache filtered users
+    val filteredUsers = remember(users, searchQuery) {
+        users.filter {
+            it.role != "Admin" && // Don't show admins
+            (it.firstName.contains(searchQuery, ignoreCase = true) ||
+             it.lastName.contains(searchQuery, ignoreCase = true) ||
+             it.username.contains(searchQuery, ignoreCase = true))
+        }
     }
+    
+    // Optimized: Pagination for large user lists
+    val paginationState = rememberPaginationState(filteredUsers, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -118,10 +132,18 @@ fun UserManagementScreen(
                     }
                 }
             } else {
+                // Optimized: Use optimized LazyList with pagination
+                val listState = LazyListOptimizer.rememberOptimizedLazyListState()
+                
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    state = listState,
+                    contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
                 ) {
-                    items(filteredUsers) { user ->
+                    items(
+                        items = paginationState.visibleItems,
+                        key = { user -> user.id }
+                    ) { user ->
                         UserCard(
                             user = user,
                             onToggleStatus = {
@@ -133,6 +155,26 @@ fun UserManagementScreen(
                                 showDeleteDialog = true
                             }
                         )
+                    }
+                    
+                    // Load more indicator
+                    item {
+                        if (paginationState.hasMore) {
+                            LaunchedEffect(Unit) {
+                                paginationState.loadMore()
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -163,7 +205,7 @@ fun UserManagementScreen(
                 Button(
                     onClick = {
                         scope.launch {
-                            adminViewModel.toggleUserStatus(selectedUser!!.id)
+                            viewModel.toggleUserStatus(selectedUser!!.id)
                             showDeactivateDialog = false
                             selectedUser = null
                         }
@@ -236,7 +278,7 @@ fun UserManagementScreen(
                 Button(
                     onClick = {
                         scope.launch {
-                            adminViewModel.deleteUser(selectedUser!!.id)
+                            viewModel.deleteUser(selectedUser!!.id)
                             showDeleteDialog = false
                             selectedUser = null
                         }
@@ -266,100 +308,155 @@ private fun UserCard(
     onToggleStatus: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Avatar
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(ElectricBlue.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = ElectricBlue,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // User Info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${user.firstName} ${user.lastName}",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "@${user.username}",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = when (user.role) {
-                            "Officer" -> InfoBlue.copy(alpha = 0.2f)
-                            else -> ElectricBlue.copy(alpha = 0.2f)
-                        },
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = user.role,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(ElectricBlue.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // User Info
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${user.firstName} ${user.lastName}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "@${user.username}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
                             color = when (user.role) {
-                                "Officer" -> InfoBlue
-                                else -> ElectricBlue
+                                "Officer" -> InfoBlue.copy(alpha = 0.2f)
+                                else -> ElectricBlue.copy(alpha = 0.2f)
                             },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        color = if (user.isActive) SuccessGreen.copy(alpha = 0.2f) else ErrorRed.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (user.isActive) "Active" else "Inactive",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (user.isActive) SuccessGreen else ErrorRed,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = user.role,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = when (user.role) {
+                                    "Officer" -> InfoBlue
+                                    else -> ElectricBlue
+                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = if (user.isActive) SuccessGreen.copy(alpha = 0.2f) else ErrorRed.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = if (user.isActive) "Active" else "Inactive",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (user.isActive) SuccessGreen else ErrorRed,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
             
-            // Toggle Status Button
-            IconButton(onClick = onToggleStatus) {
-                Icon(
-                    imageVector = if (user.isActive) Icons.Default.Block else Icons.Default.CheckCircle,
-                    contentDescription = if (user.isActive) "Deactivate" else "Activate",
-                    tint = if (user.isActive) ErrorRed else SuccessGreen
-                )
-            }
-            
-            // Delete Button
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete User",
-                    tint = DangerRed
-                )
+            // Expandable Actions
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = DividerColor.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Toggle Status Button
+                    OutlinedButton(
+                        onClick = {
+                            expanded = false
+                            onToggleStatus()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (user.isActive) ErrorRed else SuccessGreen
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            2.dp,
+                            if (user.isActive) ErrorRed else SuccessGreen
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (user.isActive) Icons.Default.Block else Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (user.isActive) "Deactivate" else "Activate",
+                            fontSize = 13.sp
+                        )
+                    }
+                    
+                    // Delete Button
+                    OutlinedButton(
+                        onClick = {
+                            expanded = false
+                            onDelete()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = DangerRed
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, DangerRed)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Delete",
+                            fontSize = 13.sp
+                        )
+                    }
+                }
             }
         }
     }

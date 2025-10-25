@@ -1,6 +1,7 @@
 package com.example.blottermanagementsystem.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
@@ -32,7 +33,9 @@ class RespondentViewModel(application: Application) : AndroidViewModel(applicati
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     val respondentsNeedingAttention: Flow<List<Respondent>> = repository.getRespondentsNeedingAttention()
@@ -87,6 +90,7 @@ class RespondentViewModel(application: Application) : AndroidViewModel(applicati
             cooperationStatus = "Not Contacted"
         )
         
+        // Save to local Room database
         val respondentId = repository.insertRespondent(respondent)
         
         // Log to person history
@@ -244,3 +248,4 @@ data class CooperationStats(
     val noResponse: Int = 0,
     val refused: Int = 0
 )
+

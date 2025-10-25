@@ -24,27 +24,34 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.Officer
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.AdminViewModel
+import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
+import com.example.blottermanagementsystem.utils.rememberDebouncedState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfficerManagementScreen(
     onNavigateBack: () -> Unit,
-    adminViewModel: AdminViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel()
 ) {
-    val officers by adminViewModel.allOfficers.collectAsState(initial = emptyList())
+    val officers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberDebouncedState("", delayMillis = 300)
     var showAddDialog by remember { mutableStateOf(false) }
     var showCredentialsDialog by remember { mutableStateOf(false) }
     var generatedUsername by remember { mutableStateOf("") }
     var generatedPassword by remember { mutableStateOf("") }
     var officerName by remember { mutableStateOf("") }
     
-    val filteredOfficers = officers.filter {
-        it.name.contains(searchQuery, ignoreCase = true) ||
-        it.badgeNumber.contains(searchQuery, ignoreCase = true)
+    val filteredOfficers = remember(officers, searchQuery) {
+        officers.filter {
+            it.name.contains(searchQuery, ignoreCase = true) ||
+            it.badgeNumber.contains(searchQuery, ignoreCase = true)
+        }
     }
+    val paginationState = rememberPaginationState(filteredOfficers, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -131,23 +138,26 @@ fun OfficerManagementScreen(
                     }
                 }
             } else {
+                val listState = LazyListOptimizer.rememberOptimizedLazyListState()
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    state = listState,
+                    contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
                 ) {
-                    items(filteredOfficers) { officer ->
+                    items(paginationState.visibleItems, key = { it.id }) { officer ->
                         OfficerCard(
                             officer = officer,
                             onDeactivate = {
                                 scope.launch {
                                     // Toggle availability
                                     val updatedOfficer = officer.copy(isAvailable = !officer.isAvailable)
-                                    adminViewModel.updateOfficer(updatedOfficer)
+                                    viewModel.updateOfficer(updatedOfficer)
                                 }
                             },
                             onDelete = {
                                 scope.launch {
                                     // Delete officer and their user account
-                                    adminViewModel.deleteOfficer(officer.id)
+                                    viewModel.deleteOfficerById(officer.id)
                                 }
                             }
                         )
@@ -170,7 +180,7 @@ fun OfficerManagementScreen(
                     val tempPassword = badgeNumber
                     
                     // Create User account FIRST to get the user ID
-                    val userId = adminViewModel.createOfficerAccount(
+                    val userId = viewModel.createOfficerAccount(
                         firstName = firstName,
                         lastName = lastName,
                         username = username,
@@ -188,7 +198,7 @@ fun OfficerManagementScreen(
                         assignedCases = 0,
                         isAvailable = true
                     )
-                    adminViewModel.addOfficer(newOfficer)
+                    viewModel.addOfficer(newOfficer)
                     
                     // Show credentials dialog
                     officerName = fullName
@@ -392,13 +402,16 @@ private fun OfficerCard(
                         text = officer.name,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        lineHeight = 22.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Badge: ${officer.badgeNumber}",
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
                 
@@ -451,21 +464,25 @@ private fun OfficerCard(
                 // Rank Badge
                 Surface(
                     color = InfoBlue.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
                     Text(
                         text = officer.rank,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = InfoBlue,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        maxLines = 1
                     )
                 }
+                
+                Spacer(modifier = Modifier.width(8.dp))
                 
                 // Cases Count
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Folder,
@@ -578,8 +595,15 @@ private fun AddOfficerDialog(
     var rank by remember { mutableStateOf("") }
     var classLevel by remember { mutableStateOf("") }
     var contactNumber by remember { mutableStateOf("") }
+    var contactError by remember { mutableStateOf<String?>(null) }
     var showRankDropdown by remember { mutableStateOf(false) }
     var showClassDropdown by remember { mutableStateOf(false) }
+    
+    // Phone validation function
+    fun validatePhoneNumber(phone: String): Boolean {
+        val pattern09 = "^09\\d{9}$".toRegex()
+        return pattern09.matches(phone)
+    }
     
     // Philippine PNP Ranks (up to Lieutenant)
     val ranks = listOf(
@@ -743,6 +767,14 @@ private fun AddOfficerDialog(
                     onValueChange = { 
                         if (it.all { char -> char.isDigit() } && it.length <= 11) {
                             contactNumber = it
+                            contactError = if (it.isNotBlank() && !validatePhoneNumber(it)) {
+                                when {
+                                    !it.startsWith("09") -> "Must start with 09"
+                                    it.length < 11 -> "Need ${11 - it.length} more digit(s)"
+                                    it.length > 11 -> "Too long (max 11 digits)"
+                                    else -> "Invalid format"
+                                }
+                            } else null
                         }
                     },
                     label = { Text("Contact Number") },
@@ -754,9 +786,25 @@ private fun AddOfficerDialog(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                     ),
                     modifier = Modifier.fillMaxWidth(),
+                    isError = contactError != null,
+                    supportingText = {
+                        if (contactError != null) {
+                            Text(
+                                text = contactError!!,
+                                color = ErrorRed,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Text(
+                                text = "Format: 09XXXXXXXXX (11 digits)",
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = ElectricBlue,
-                        unfocusedBorderColor = DividerColor
+                        unfocusedBorderColor = DividerColor,
+                        errorBorderColor = ErrorRed
                     )
                 )
                 

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
 import com.example.blottermanagementsystem.viewmodel.LegalDocumentsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +56,9 @@ fun LegalDocumentsDashboardScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
+        val listState = LazyListOptimizer.rememberOptimizedLazyListState()
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -68,7 +71,7 @@ fun LegalDocumentsDashboardScreen(
                     "Document Statistics",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             
@@ -111,7 +114,7 @@ fun LegalDocumentsDashboardScreen(
                     "Document Management",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             
@@ -152,7 +155,7 @@ fun LegalDocumentsDashboardScreen(
                     "Quick Actions",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             
@@ -209,10 +212,11 @@ fun StatCard(
                 fontWeight = FontWeight.Bold,
                 color = color
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 title,
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -260,19 +264,19 @@ fun DocumentActionCard(
                     title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     description,
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color.Gray
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

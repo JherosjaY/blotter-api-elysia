@@ -7,8 +7,8 @@ package com.example.blottermanagementsystem.navigation
  * 
  * ROLE-BASED NAVIGATION STRUCTURE:
  * 
- * 👤 USER/CLERK ROLE:
- *    - Dashboard: ClerkDashboardScreen
+ * 👤 USER ROLE:
+ *    - Dashboard: UserDashboardScreen
  *    - Can: File reports, view reports, view hearings
  *    - Cannot: Manage users, add respondents/suspects, assign officers
  * 
@@ -42,13 +42,17 @@ import com.example.blottermanagementsystem.ui.screens.*
 // ========== SHARED SCREENS (All Roles) ==========
 import com.example.blottermanagementsystem.ui.screens.auth.LoginScreen
 import com.example.blottermanagementsystem.ui.screens.auth.RegisterScreen
-import com.example.blottermanagementsystem.ui.screens.auth.ForcePasswordChangeScreen
+import com.example.blottermanagementsystem.ui.screens.auth.ForceChangePasswordScreen
 
 // ========== DASHBOARDS (Role-Specific) ==========
 import com.example.blottermanagementsystem.ui.screens.dashboard.AdminDashboardScreen // ADMIN ONLY
-import com.example.blottermanagementsystem.ui.screens.dashboard.ClerkDashboardScreen // USER/CLERK ONLY
+import com.example.blottermanagementsystem.ui.screens.admin.RecordsArchiveScreen // ADMIN ONLY
+import com.example.blottermanagementsystem.ui.screens.dashboard.UserDashboardScreen // USER ONLY
 import com.example.blottermanagementsystem.ui.screens.onboarding.OnboardingScreen
 import com.example.blottermanagementsystem.ui.screens.profile.ProfileScreen
+import com.example.blottermanagementsystem.ui.screens.profile.UserProfileScreen
+import com.example.blottermanagementsystem.ui.screens.profile.AdminProfileScreen
+import com.example.blottermanagementsystem.ui.screens.profile.OfficerProfileScreen
 import com.example.blottermanagementsystem.ui.screens.profile.ProfilePictureSelectionScreen // USER/CLERK first login
 import com.example.blottermanagementsystem.ui.screens.notifications.NotificationsScreen
 import com.example.blottermanagementsystem.ui.screens.settings.SettingsScreen
@@ -77,7 +81,7 @@ import com.example.blottermanagementsystem.ui.screens.witness.AddWitnessScreen /
 import com.example.blottermanagementsystem.ui.screens.witness.WitnessListScreen
 import com.example.blottermanagementsystem.ui.screens.evidence.AddEvidenceScreen // OFFICER adds
 import com.example.blottermanagementsystem.ui.screens.evidence.EvidenceListScreen
-import com.example.blottermanagementsystem.ui.screens.hearing.AddHearingScreen // OFFICER schedules
+import com.example.blottermanagementsystem.ui.screens.hearings.AddHearingScreen // OFFICER schedules
 import com.example.blottermanagementsystem.ui.screens.hearings.HearingListScreen
 import com.example.blottermanagementsystem.ui.screens.resolution.AddResolutionScreen // OFFICER proposes, ADMIN closes
 import com.example.blottermanagementsystem.ui.screens.legal.LegalDocumentsDashboardScreen
@@ -139,30 +143,17 @@ fun NavGraph(
                             Screen.AdminDashboard.route
                         }
                         "Officer" -> {
-                            // OFFICER: Check if must change password
-                            // Also check if username still has "off." prefix (legacy check for existing officers)
-                            val needsPasswordChange = preferencesManager.mustChangePassword || 
-                                                     username.startsWith("off.", ignoreCase = true)
-                            
-                            // DEBUG: Show what's happening
-                            android.util.Log.d("NavGraph", "Officer Login - Username: $username, mustChangePassword: ${preferencesManager.mustChangePassword}, needsPasswordChange: $needsPasswordChange")
-                            
-                            if (needsPasswordChange) {
-                                // First login: Force password change → Welcome Splash → Dashboard
-                                Screen.ForcePasswordChange.createRoute(userId, username)
-                            } else {
-                                // Subsequent logins: Direct to dashboard
-                                Screen.OfficerDashboard.route
-                            }
+                            // OFFICER: Go directly to dashboard
+                            Screen.OfficerDashboard.route
                         }
                         else -> {
-                            // USER/CLERK: Check if profile picture selected
+                            // USER: Check if profile picture selected
                             if (!preferencesManager.hasSelectedProfilePicture) {
                                 // First login: Must select profile picture
                                 Screen.ProfilePictureSelection.route
                             } else {
                                 // Subsequent logins: Direct to dashboard
-                                Screen.ClerkDashboard.route
+                                Screen.UserDashboard.route
                             }
                         }
                     }
@@ -177,33 +168,7 @@ fun NavGraph(
             )
         }
         
-        // Force Password Change (For officers with temporary credentials)
-        composable(
-            route = Screen.ForcePasswordChange.route,
-            arguments = listOf(
-                navArgument("userId") { type = NavType.IntType },
-                navArgument("currentUsername") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val context = LocalContext.current
-            val preferencesManager = remember { PreferencesManager(context) }
-            val userId = backStackEntry.arguments?.getInt("userId") ?: 0
-            val currentUsername = backStackEntry.arguments?.getString("currentUsername") ?: ""
-            
-            ForcePasswordChangeScreen(
-                userId = userId,
-                currentUsername = currentUsername,
-                onPasswordChanged = {
-                    // After password change, show welcome splash
-                    val officerName = preferencesManager.firstName ?: "Officer"
-                    navController.navigate(Screen.OfficerWelcomeSplash.createRoute(officerName)) {
-                        popUpTo(Screen.ForcePasswordChange.route) { inclusive = true }
-                    }
-                }
-            )
-        }
-        
-        // Officer Welcome Splash (After password change)
+        // Officer Welcome Splash
         composable(
             route = Screen.OfficerWelcomeSplash.route,
             arguments = listOf(
@@ -235,8 +200,8 @@ fun NavGraph(
             
             ProfilePictureSelectionScreen(
                 onComplete = {
-                    // Only regular users reach this screen, go to Clerk Dashboard
-                    navController.navigate(Screen.ClerkDashboard.route) {
+                    // Only regular users reach this screen, go to User Dashboard
+                    navController.navigate(Screen.UserDashboard.route) {
                         popUpTo(Screen.ProfilePictureSelection.route) { inclusive = true }
                     }
                 }
@@ -267,32 +232,20 @@ fun NavGraph(
             
             AdminDashboardScreen(
                 firstName = preferencesManager.firstName ?: "Admin",
-                onNavigateToReports = {
-                    navController.navigate(Screen.ReportList.route)
-                },
                 onNavigateToUsers = {
                     navController.navigate(Screen.UserManagement.route)
                 },
                 onNavigateToOfficers = {
                     navController.navigate(Screen.OfficerManagement.route)
                 },
-                onNavigateToActivityLogs = {
-                    navController.navigate(Screen.ActivityLogs.route)
+                onNavigateToRecordsArchive = {
+                    navController.navigate(Screen.RecordsArchive.route)
                 },
-                onNavigateToReportOversight = {
-                    navController.navigate(Screen.AdminReportOversight.route)
-                },
-                onNavigateToHearings = {
-                    navController.navigate(Screen.HearingList.route)
-                },
-                onNavigateToAnalytics = {
-                    navController.navigate(Screen.Analytics.route)
+                onNavigateToQRScanner = {
+                    navController.navigate(Screen.QRScanner.route)
                 },
                 onNavigateToNotifications = {
                     navController.navigate(Screen.Notifications.route)
-                },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
                 },
                 onNavigateToProfile = {
                     navController.navigate(Screen.Profile.route)
@@ -302,6 +255,16 @@ fun NavGraph(
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
+                }
+            )
+        }
+        
+        // Records Archive Screen
+        composable(Screen.RecordsArchive.route) {
+            RecordsArchiveScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToReportDetail = { reportId ->
+                    navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
                 }
             )
         }
@@ -321,7 +284,8 @@ fun NavGraph(
                         db.evidenceDao(), db.hearingDao(), db.statusHistoryDao(), db.resolutionDao(),
                         db.officerDao(), db.activityLogDao(), db.notificationDao(), db.statusDao(),
                         db.personDao(), db.respondentDao(), db.personHistoryDao(), db.smsNotificationDao(),
-                        db.respondentStatementDao(), db.summonsDao(), db.kpFormDao(), db.mediationSessionDao()
+                        db.respondentStatementDao(), db.summonsDao(), db.kpFormDao(), db.mediationSessionDao(),
+                        db.caseTimelineDao(), db.caseTemplateDao()
                     )
                 }
             }
@@ -353,13 +317,16 @@ fun NavGraph(
                     navController.navigate(Screen.Profile.route)
                 },
                 onNavigateToReportDetail = { reportId ->
-                    navController.navigate(Screen.ReportDetail.createRoute(reportId))
+                    navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
                 },
                 onNavigateToQRScanner = {
                     navController.navigate(Screen.QRScanner.route)
                 },
                 onNavigateToAnalytics = {
                     navController.navigate(Screen.OfficerAnalytics.createRoute(officerId))
+                },
+                onNavigateToSmsNotifications = {
+                    navController.navigate(Screen.SmsNotificationList.createRoute())
                 },
                 onLogout = {
                     authViewModel.logout()
@@ -371,15 +338,15 @@ fun NavGraph(
         }
         
         // ============================================
-        // USER/CLERK DASHBOARD & SCREENS
+        // USER DASHBOARD & SCREENS
         // ============================================
         
-        // Clerk Dashboard
-        composable(Screen.ClerkDashboard.route) {
+        // User Dashboard
+        composable(Screen.UserDashboard.route) {
             val context = LocalContext.current
             val preferencesManager = remember { PreferencesManager(context) }
             
-            ClerkDashboardScreen(
+            UserDashboardScreen(
                 userId = preferencesManager.userId,
                 firstName = preferencesManager.firstName ?: "User",
                 onNavigateToAddReport = {
@@ -429,10 +396,19 @@ fun NavGraph(
             val filter = backStackEntry.arguments?.getString("filter") ?: "All"
             val autoFocus = backStackEntry.arguments?.getBoolean("autoFocus") ?: false
             
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userRole = preferencesManager.userRole ?: "User"
+            
             ReportListScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToDetail = { reportId, isEditable ->
-                    navController.navigate(Screen.ReportDetail.createRoute(reportId, isEditable))
+                    // Navigate to role-specific screen
+                    when (userRole) {
+                        "Admin" -> navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
+                        "Officer" -> navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
+                        else -> navController.navigate(Screen.UserReportDetail.createRoute(reportId))
+                    }
                 },
                 onNavigateToAdd = {
                     navController.navigate(Screen.AddReport.route)
@@ -498,6 +474,9 @@ fun NavGraph(
                 },
                 onNavigateToLegalDocuments = { id ->
                     navController.navigate(Screen.LegalDocumentsDashboard.createRoute(id))
+                },
+                onNavigateToCaseTimeline = { id, caseNumber ->
+                    navController.navigate(Screen.CaseTimeline.createRoute(id, caseNumber))
                 },
                 onExportPDF = {
                     // Export PDF with evidence
@@ -579,6 +558,142 @@ fun NavGraph(
             )
         }
         
+        // ADMIN Report Detail Screen
+        composable(
+            route = Screen.AdminReportDetail.route,
+            arguments = listOf(navArgument("reportId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            
+            com.example.blottermanagementsystem.ui.screens.admin.AdminReportDetailScreen(
+                reportId = reportId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToRespondentList = { id ->
+                    navController.navigate(Screen.RespondentList.createRoute(id))
+                },
+                onNavigateToSuspectList = { id ->
+                    navController.navigate(Screen.SuspectList.createRoute(id))
+                },
+                onNavigateToWitnessList = { id ->
+                    navController.navigate(Screen.WitnessList.createRoute(id))
+                },
+                onNavigateToEvidenceList = { id ->
+                    navController.navigate(Screen.EvidenceList.createRoute(id))
+                },
+                onNavigateToHearingList = { id ->
+                    navController.navigate(Screen.HearingList.route)
+                },
+                onNavigateToLegalDocuments = { id ->
+                    navController.navigate(Screen.LegalDocumentsDashboard.createRoute(id))
+                },
+                onNavigateToCaseTimeline = { id, caseNumber ->
+                    navController.navigate(Screen.CaseTimeline.createRoute(id, caseNumber))
+                },
+                onNavigateToEnhancedQR = { id, caseNumber ->
+                    navController.navigate(Screen.EnhancedQR.createRoute(id, caseNumber))
+                },
+                onNavigateToAdvancedAnalytics = {
+                    navController.navigate(Screen.AdvancedAnalytics.route)
+                },
+                onNavigateToIncidentMap = {
+                    navController.navigate(Screen.IncidentMap.route)
+                }
+            )
+        }
+        
+        // OFFICER Report Detail Screen
+        composable(
+            route = Screen.OfficerReportDetail.route,
+            arguments = listOf(navArgument("reportId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            
+            com.example.blottermanagementsystem.ui.screens.officer.OfficerReportDetailScreen(
+                reportId = reportId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddRespondent = { id ->
+                    navController.navigate(Screen.AddRespondent.createRoute(id))
+                },
+                onNavigateToRespondentList = { id ->
+                    navController.navigate(Screen.RespondentList.createRoute(id))
+                },
+                onNavigateToAddSuspect = { id ->
+                    navController.navigate(Screen.AddSuspect.createRoute(id))
+                },
+                onNavigateToSuspectList = { id ->
+                    navController.navigate(Screen.SuspectList.createRoute(id))
+                },
+                onNavigateToAddWitness = { id ->
+                    navController.navigate(Screen.AddWitness.createRoute(id))
+                },
+                onNavigateToWitnessList = { id ->
+                    navController.navigate(Screen.WitnessList.createRoute(id))
+                },
+                onNavigateToAddEvidence = { id ->
+                    navController.navigate(Screen.AddEvidence.createRoute(id))
+                },
+                onNavigateToEvidenceList = { id ->
+                    navController.navigate(Screen.EvidenceList.createRoute(id))
+                },
+                onNavigateToAddHearing = { id ->
+                    navController.navigate(Screen.AddHearing.createRoute(id))
+                },
+                onNavigateToHearingList = { id ->
+                    navController.navigate(Screen.HearingList.route)
+                },
+                onNavigateToAddResolution = { id ->
+                    navController.navigate(Screen.AddResolution.createRoute(id))
+                },
+                onNavigateToLegalDocuments = { id ->
+                    navController.navigate(Screen.LegalDocumentsDashboard.createRoute(id))
+                },
+                onNavigateToCaseTimeline = { id, caseNumber ->
+                    navController.navigate(Screen.CaseTimeline.createRoute(id, caseNumber))
+                },
+                onNavigateToPhotoGallery = { id ->
+                    navController.navigate(Screen.PhotoGallery.createRoute(id))
+                },
+                onNavigateToEnhancedQR = { id, caseNumber ->
+                    navController.navigate(Screen.EnhancedQR.createRoute(id, caseNumber))
+                },
+                onNavigateToHearingCalendar = {
+                    navController.navigate(Screen.HearingCalendar.route)
+                },
+                onNavigateToIncidentMap = {
+                    navController.navigate(Screen.IncidentMap.route)
+                },
+                onNavigateToVoiceToText = {
+                    navController.navigate(Screen.VoiceToText.route)
+                }
+            )
+        }
+        
+        // USER Report Detail Screen
+        composable(
+            route = Screen.UserReportDetail.route,
+            arguments = listOf(navArgument("reportId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userId = preferencesManager.userId
+            
+            com.example.blottermanagementsystem.ui.screens.user.UserReportDetailScreen(
+                reportId = reportId,
+                userId = userId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToEdit = { id ->
+                    navController.navigate(Screen.EditReport.createRoute(id))
+                },
+                onNavigateToHearingList = { id ->
+                    navController.navigate(Screen.HearingList.route)
+                },
+                onNavigateToCaseTimeline = { id, caseNumber ->
+                    navController.navigate(Screen.CaseTimeline.createRoute(id, caseNumber))
+                }
+            )
+        }
+        
         composable(
             route = Screen.EditReport.route,
             arguments = listOf(navArgument("reportId") { type = NavType.IntType })
@@ -615,34 +730,80 @@ fun NavGraph(
             AdminReportOversightScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToReportDetail = { reportId ->
-                    navController.navigate(Screen.ReportDetail.createRoute(reportId))
+                    navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
                 }
             )
         }
         
         // Other Screens
         composable(Screen.Notifications.route) {
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userRole = preferencesManager.userRole ?: "User"
+            
             NotificationsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToReport = { reportId ->
-                    navController.navigate(Screen.ReportDetail.createRoute(reportId))
+                    when (userRole) {
+                        "Admin" -> navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
+                        "Officer" -> navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
+                        else -> navController.navigate(Screen.UserReportDetail.createRoute(reportId))
+                    }
                 }
             )
         }
         
         composable(Screen.Profile.route) {
-            ProfileScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
-                },
-                onLogout = {
-                    authViewModel.logout()
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userRole = preferencesManager.userRole ?: "User"
+            
+            // Route to appropriate profile screen based on role
+            when (userRole) {
+                "Admin" -> {
+                    AdminProfileScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSettings = {
+                            navController.navigate(Screen.Settings.route)
+                        },
+                        onLogout = {
+                            authViewModel.logout()
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
                 }
-            )
+                "Officer" -> {
+                    OfficerProfileScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSettings = {
+                            navController.navigate(Screen.Settings.route)
+                        },
+                        onLogout = {
+                            authViewModel.logout()
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+                else -> {
+                    // User/Clerk role - with photo selection
+                    UserProfileScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToSettings = {
+                            navController.navigate(Screen.Settings.route)
+                        },
+                        onLogout = {
+                            authViewModel.logout()
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+            }
         }
         
         composable(Screen.Settings.route) {
@@ -680,8 +841,8 @@ fun NavGraph(
                     // Parse QR code and navigate to report
                     val reportId = com.example.blottermanagementsystem.utils.QRCodeGenerator.parseReportQRCode(code)
                     if (reportId != null) {
-                        // Valid blotter report QR code
-                        navController.navigate(Screen.ReportDetail.createRoute(reportId)) {
+                        // Valid blotter report QR code - Officers use QR scanner
+                        navController.navigate(Screen.OfficerReportDetail.createRoute(reportId)) {
                             popUpTo(Screen.QRScanner.route) { inclusive = true }
                         }
                         android.widget.Toast.makeText(
@@ -743,7 +904,7 @@ fun NavGraph(
                 officerId = officerId,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToReportDetail = { reportId ->
-                    navController.navigate(Screen.ReportDetail.createRoute(reportId, false))
+                    navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
                 }
             )
         }
@@ -1053,6 +1214,136 @@ fun NavGraph(
         composable(Screen.BackupRestore.route) {
             BackupRestoreScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        // Case Timeline Screen
+        composable(
+            route = Screen.CaseTimeline.route,
+            arguments = listOf(
+                navArgument("reportId") { type = NavType.IntType },
+                navArgument("caseNumber") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            val caseNumber = backStackEntry.arguments?.getString("caseNumber") ?: ""
+            
+            com.example.blottermanagementsystem.ui.screens.timeline.CaseTimelineScreen(
+                reportId = reportId,
+                caseNumber = caseNumber,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        // Case Templates Screen
+        composable(Screen.CaseTemplates.route) {
+            com.example.blottermanagementsystem.ui.screens.templates.CaseTemplatesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onTemplateSelected = { template ->
+                    // Navigate to add report with template
+                    navController.navigate(Screen.AddReport.route)
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        // Advanced Search Screen
+        composable(Screen.AdvancedSearch.route) {
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userRole = preferencesManager.userRole ?: "User"
+            
+            com.example.blottermanagementsystem.ui.screens.search.AdvancedSearchScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onReportClick = { reportId ->
+                    when (userRole) {
+                        "Admin" -> navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
+                        "Officer" -> navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
+                        else -> navController.navigate(Screen.UserReportDetail.createRoute(reportId))
+                    }
+                }
+            )
+        }
+        
+        // Hearing Calendar Screen
+        composable(Screen.HearingCalendar.route) {
+            com.example.blottermanagementsystem.ui.screens.calendar.HearingCalendarScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onHearingClick = { hearingId ->
+                    // Navigate to hearing detail if needed
+                }
+            )
+        }
+        
+        // Photo Gallery Screen
+        composable(
+            route = Screen.PhotoGallery.route,
+            arguments = listOf(navArgument("reportId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            
+            com.example.blottermanagementsystem.ui.screens.evidence.PhotoGalleryScreen(
+                reportId = reportId,
+                photoUris = emptyList(), // TODO: Load from evidence
+                onNavigateBack = { navController.popBackStack() },
+                onAddPhoto = {
+                    navController.navigate(Screen.AddEvidence.createRoute(reportId))
+                }
+            )
+        }
+        
+        // Analytics Screen
+        composable(Screen.AdvancedAnalytics.route) {
+            com.example.blottermanagementsystem.ui.screens.analytics.AnalyticsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        // Enhanced QR Screen
+        composable(
+            route = Screen.EnhancedQR.route,
+            arguments = listOf(
+                navArgument("reportId") { type = NavType.IntType },
+                navArgument("caseNumber") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getInt("reportId") ?: 0
+            val caseNumber = backStackEntry.arguments?.getString("caseNumber") ?: ""
+            
+            com.example.blottermanagementsystem.ui.screens.qr.EnhancedQRScreen(
+                reportId = reportId,
+                caseNumber = caseNumber,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        // Incident Map Screen
+        composable(Screen.IncidentMap.route) {
+            val context = LocalContext.current
+            val preferencesManager = remember { PreferencesManager(context) }
+            val userRole = preferencesManager.userRole ?: "User"
+            
+            com.example.blottermanagementsystem.ui.screens.map.IncidentMapScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onReportClick = { reportId ->
+                    when (userRole) {
+                        "Admin" -> navController.navigate(Screen.AdminReportDetail.createRoute(reportId))
+                        "Officer" -> navController.navigate(Screen.OfficerReportDetail.createRoute(reportId))
+                        else -> navController.navigate(Screen.UserReportDetail.createRoute(reportId))
+                    }
+                }
+            )
+        }
+        
+        // Voice-to-Text Screen
+        composable(Screen.VoiceToText.route) {
+            com.example.blottermanagementsystem.ui.screens.voice.VoiceToTextScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onTextGenerated = { text ->
+                    // Navigate back with result
+                    navController.previousBackStackEntry?.savedStateHandle?.set("voiceText", text)
+                    navController.popBackStack()
+                }
             )
         }
     }

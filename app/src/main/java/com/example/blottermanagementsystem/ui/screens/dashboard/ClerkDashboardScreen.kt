@@ -8,6 +8,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,10 +28,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.ui.components.DashboardTopBar
 import com.example.blottermanagementsystem.ui.components.EmptyState
+import com.example.blottermanagementsystem.ui.screens.reports.ReportCard
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ClerkDashboardScreen(
     userId: Int,
@@ -42,12 +48,28 @@ fun ClerkDashboardScreen(
     onLogout: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel()
 ) {
+    val scope = rememberCoroutineScope()
     val allReports by viewModel.allReports.collectAsState(initial = emptyList())
     // Filter reports by current user
     val myReports = allReports.filter { it.userId == userId }
     val pendingCount = myReports.count { it.status == "Pending" || it.status == "Assigned" }
     val ongoingCount = myReports.count { it.status == "Under Investigation" }
     val resolvedCount = myReports.count { it.status == "Resolved" }
+    
+    var isRefreshing by remember { mutableStateOf(false) }
+    
+    // Pull-to-refresh state
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            scope.launch {
+                isRefreshing = true
+                viewModel.refreshDashboard()
+                kotlinx.coroutines.delay(1000)
+                isRefreshing = false
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -62,10 +84,14 @@ fun ClerkDashboardScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues)
+                .pullRefresh(pullRefreshState)
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -235,9 +261,9 @@ fun ClerkDashboardScreen(
                 }
             } else {
                 items(myReports.take(5)) { report ->
-                    com.example.blottermanagementsystem.ui.screens.dashboard.RecentReportCard(
+                    ReportCard(
                         report = report,
-                        onClick = onNavigateToViewReports
+                        onClick = { onNavigateToViewReports() }
                     )
                 }
             }
@@ -286,6 +312,16 @@ fun ClerkDashboardScreen(
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
+        
+        // Pull-to-refresh indicator
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            backgroundColor = MaterialTheme.colorScheme.surface,
+            contentColor = ElectricBlue
+        )
+    }
     }
 }
 

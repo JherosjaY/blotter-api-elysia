@@ -24,7 +24,9 @@ class BlotterRepository(
     private val respondentStatementDao: RespondentStatementDao,
     private val summonsDao: SummonsDao,
     private val kpFormDao: KPFormDao,
-    private val mediationSessionDao: MediationSessionDao
+    private val mediationSessionDao: MediationSessionDao,
+    private val caseTimelineDao: CaseTimelineDao,
+    private val caseTemplateDao: CaseTemplateDao
 ) {
     
     // User operations
@@ -190,6 +192,7 @@ class BlotterRepository(
     suspend fun recordReply(notificationId: Int, reply: String, date: Long) = 
         smsNotificationDao.recordReply(notificationId, reply, date)
     suspend fun getFailedNotificationCount() = smsNotificationDao.getFailedNotificationCount()
+    suspend fun deleteSmsNotification(notificationId: Int) = smsNotificationDao.deleteNotification(notificationId)
     
     // Respondent Statement operations
     fun getStatementsByRespondentId(respondentId: Int) = respondentStatementDao.getStatementsByRespondentId(respondentId)
@@ -252,4 +255,22 @@ class BlotterRepository(
     suspend fun getMediationSessionCount(reportId: Int) = mediationSessionDao.getMediationSessionCount(reportId)
     suspend fun getSuccessfulMediationCount() = mediationSessionDao.getSuccessfulMediationCount()
     suspend fun getFailedMediationCount() = mediationSessionDao.getFailedMediationCount()
+    
+    // Case Timeline operations
+    fun getTimelineByReportId(reportId: Int) = caseTimelineDao.getTimelineByReportId(reportId)
+    suspend fun getTimelineByReportIdSync(reportId: Int) = caseTimelineDao.getTimelineByReportIdSync(reportId)
+    suspend fun insertTimelineEvent(event: CaseTimeline) = caseTimelineDao.insertTimelineEvent(event)
+    suspend fun insertTimelineEvents(events: List<CaseTimeline>) = caseTimelineDao.insertTimelineEvents(events)
+    suspend fun deleteTimelineEvent(event: CaseTimeline) = caseTimelineDao.deleteTimelineEvent(event)
+    suspend fun deleteTimelineByReportId(reportId: Int) = caseTimelineDao.deleteTimelineByReportId(reportId)
+    suspend fun getTimelineEventCount(reportId: Int) = caseTimelineDao.getTimelineEventCount(reportId)
+    
+    // Case Template operations
+    fun getAllActiveTemplates() = caseTemplateDao.getAllActiveTemplates()
+    suspend fun getAllActiveTemplatesSync() = caseTemplateDao.getAllActiveTemplatesSync()
+    suspend fun getTemplateById(templateId: Int) = caseTemplateDao.getTemplateById(templateId)
+    suspend fun insertTemplate(template: CaseTemplate) = caseTemplateDao.insertTemplate(template)
+    suspend fun updateTemplate(template: CaseTemplate) = caseTemplateDao.updateTemplate(template)
+    suspend fun deleteTemplate(template: CaseTemplate) = caseTemplateDao.deleteTemplate(template)
+    suspend fun incrementTemplateUsage(templateId: Int) = caseTemplateDao.incrementUsageCount(templateId)
 }

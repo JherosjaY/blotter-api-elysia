@@ -1,6 +1,7 @@
 package com.example.blottermanagementsystem.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
@@ -11,6 +12,8 @@ import com.example.blottermanagementsystem.data.entity.Notification
 import com.example.blottermanagementsystem.data.entity.ActivityLog
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
@@ -35,7 +38,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     // User Management
@@ -57,9 +62,26 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     // Officer Management
-    val allOfficers: Flow<List<Officer>> = repository.getAllOfficers()
+    private val _allOfficers = MutableStateFlow<List<Officer>>(emptyList())
+    val allOfficers: StateFlow<List<Officer>> = _allOfficers
+    
+    init {
+        loadOfficers()
+    }
+    
+    private fun loadOfficers() {
+        viewModelScope.launch {
+            try {
+                // Load officers from database
+                repository.getAllOfficersSync()
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error loading officers: ${e.message}")
+            }
+        }
+    }
     
     suspend fun addOfficer(officer: Officer) {
+        // Save to local Room database
         repository.insertOfficer(officer)
     }
     
@@ -273,13 +295,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val reports = repository.getAllReportsSync()
         
         return SystemStatistics(
-            totalUsers = users.count { it.role != "Admin" },
+            totalUsers = users.count { it.isActive && it.role != "Admin" },
             activeUsers = users.count { it.isActive && it.role != "Admin" },
-            totalOfficers = officers.size,
-            totalReports = reports.size,
-            pendingReports = reports.count { it.status == "Pending" },
-            ongoingReports = reports.count { it.status == "Under Investigation" },
-            resolvedReports = reports.count { it.status == "Resolved" },
+            totalOfficers = officers.count { it.isAvailable },
+            totalReports = reports.count { !it.isArchived },
+            pendingReports = reports.count { it.status == "Pending" && !it.isArchived },
+            ongoingReports = reports.count { it.status == "Under Investigation" && !it.isArchived },
+            resolvedReports = reports.count { it.status == "Resolved" && !it.isArchived },
             archivedReports = reports.count { it.isArchived }
         )
     }
@@ -295,3 +317,4 @@ data class SystemStatistics(
     val resolvedReports: Int,
     val archivedReports: Int
 )
+

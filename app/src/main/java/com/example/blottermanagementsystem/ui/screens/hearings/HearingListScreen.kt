@@ -14,27 +14,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.ui.components.EmptyState
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
 import com.example.blottermanagementsystem.utils.PreferencesManager
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HearingListScreen(
+    reportId: Int? = null,
     onNavigateBack: () -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-    val preferencesManager = remember { PreferencesManager(context) }
-    val userId = preferencesManager.userId
-    
     // Get hearings from database  
-    val hearings by viewModel.getAllHearings().collectAsState(initial = emptyList())
+    val hearings by if (reportId != null) {
+        viewModel.getHearingsByReportId(reportId).collectAsState(initial = emptyList())
+    } else {
+        viewModel.getAllHearings().collectAsState(initial = emptyList())
+    }
+    val paginationState = rememberPaginationState(hearings, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -47,7 +51,7 @@ fun HearingListScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${hearings.size} hearings",
+                            text = "${paginationState.visibleItems.size} hearings",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -69,7 +73,7 @@ fun HearingListScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        if (hearings.isEmpty()) {
+        if (paginationState.visibleItems.isEmpty()) {
             EmptyState(
                 icon = "📅",
                 title = "No Hearings",
@@ -78,15 +82,17 @@ fun HearingListScreen(
                 onActionClick = { /* Add hearing */ }
             )
         } else {
+            val listState = LazyListOptimizer.rememberOptimizedLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING),
                 userScrollEnabled = true
             ) {
-                items(hearings, key = { it.id }) { hearing ->
+                items(paginationState.visibleItems, key = { it.id }) { hearing ->
                     HearingCard(hearing)
                 }
                 

@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.Respondent
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
 import com.example.blottermanagementsystem.viewmodel.RespondentViewModel
 import kotlinx.coroutines.launch
 
@@ -33,6 +35,7 @@ fun RespondentListScreen(
     viewModel: RespondentViewModel = viewModel()
 ) {
     val respondents by viewModel.getRespondentsByReportId(reportId).collectAsState(initial = emptyList())
+    val paginationState = rememberPaginationState(respondents, pageSize = 20)
     val cooperationStats by viewModel.cooperationStats.collectAsState()
     
     Scaffold(
@@ -41,13 +44,13 @@ fun RespondentListScreen(
                 title = { 
                     Column {
                         Text(
-                            if (isAdmin) "Respondents (View Only)" else "Respondents",
+                            "Respondents",
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             "Case #$reportId",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -72,39 +75,8 @@ fun RespondentListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(16.dp)
         ) {
-            // Cooperation Stats
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        "Cooperation Overview",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        StatItem("Cooperated", cooperationStats.cooperated, SuccessGreen)
-                        StatItem("Pending", cooperationStats.pending, WarningYellow)
-                        StatItem("No Response", cooperationStats.noResponse, Color.Gray)
-                        StatItem("Refused", cooperationStats.refused, DangerRed)
-                    }
-                }
-            }
-            
             // Respondent List
             if (respondents.isEmpty()) {
                 Box(
@@ -120,12 +92,12 @@ fun RespondentListScreen(
                             Icons.Default.PersonOff,
                             contentDescription = null,
                             modifier = Modifier.size(64.dp),
-                            tint = Color.Gray
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             "No respondents added yet",
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 16.sp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -140,12 +112,14 @@ fun RespondentListScreen(
                     }
                 }
             } else {
+                val listState = LazyListOptimizer.rememberOptimizedLazyListState()
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
                 ) {
-                    items(respondents) { respondent ->
+                    items(paginationState.visibleItems, key = { it.id }) { respondent ->
                         RespondentCard(
                             respondent = respondent,
                             onClick = { onNavigateToRespondentDetail(respondent.id) }
@@ -171,7 +145,7 @@ fun StatItem(label: String, count: Int, color: Color) {
         Text(
             label,
             fontSize = 12.sp,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

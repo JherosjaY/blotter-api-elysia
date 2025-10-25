@@ -3,6 +3,7 @@ package com.example.blottermanagementsystem.ui.screens.settings
 import android.app.Activity
 import android.media.RingtoneManager
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,8 +31,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
     
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var soundEnabled by remember { mutableStateOf(true) }
+    var notificationsEnabled by remember { mutableStateOf(preferencesManager.notificationsEnabled) }
+    var soundEnabled by remember { mutableStateOf(preferencesManager.notificationSoundEnabled) }
     
     var showVersionDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
@@ -82,11 +84,12 @@ fun SettingsScreen(
                 SettingCard {
                     SettingSwitchItem(
                         title = "Enable Notifications",
-                        description = "Receive notifications for updates",
+                        description = "Receive app notifications",
                         icon = Icons.Default.Notifications,
                         checked = notificationsEnabled,
                         onCheckedChange = { enabled ->
                             notificationsEnabled = enabled
+                            preferencesManager.notificationsEnabled = enabled
                             Toast.makeText(
                                 context,
                                 if (enabled) "Notifications enabled" else "Notifications disabled",
@@ -102,10 +105,11 @@ fun SettingsScreen(
                     SettingSwitchItem(
                         title = "Sound",
                         description = "Play sound for notifications",
-                        icon = Icons.Default.Star,
+                        icon = Icons.Default.VolumeUp,
                         checked = soundEnabled,
                         onCheckedChange = { enabled ->
                             soundEnabled = enabled
+                            preferencesManager.notificationSoundEnabled = enabled
                             
                             // Play notification sound when enabled
                             if (enabled) {

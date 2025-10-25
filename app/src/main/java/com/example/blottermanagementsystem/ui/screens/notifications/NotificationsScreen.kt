@@ -24,6 +24,8 @@ import com.example.blottermanagementsystem.data.entity.Notification
 import com.example.blottermanagementsystem.ui.components.EmptyState
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.utils.PreferencesManager
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
 import com.example.blottermanagementsystem.viewmodel.NotificationViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,6 +45,9 @@ fun NotificationsScreen(
     val notifications by notificationViewModel.getNotificationsByUser(userId).collectAsState(initial = emptyList())
     var selectedNotifications by remember { mutableStateOf(setOf<Int>()) }
     var isSelectionMode by remember { mutableStateOf(false) }
+    
+    // Optimized: Pagination for large notification lists
+    val paginationState = rememberPaginationState(notifications, pageSize = 20)
     
     // Function to mark notification as read
     fun markAsRead(notificationId: Int) {
@@ -144,15 +149,22 @@ fun NotificationsScreen(
                 onActionClick = null
             )
         } else {
+            // Optimized: Use optimized LazyList with pagination
+            val listState = LazyListOptimizer.rememberOptimizedLazyListState()
+            
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING),
                 userScrollEnabled = true
             ) {
-                items(notifications) { notification ->
+                items(
+                    items = paginationState.visibleItems,
+                    key = { notification -> notification.id }
+                ) { notification ->
                     NotificationCard(
                         notification = notification,
                         isSelected = notification.id in selectedNotifications,

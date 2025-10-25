@@ -83,8 +83,8 @@ object ExportUtils {
                 row.createCell(9).setCellValue(report.narrative)
             }
             
-            // Auto-size columns
-            headers.indices.forEach { sheet.autoSizeColumn(it) }
+            // Set column widths manually (autoSizeColumn doesn't work on Android)
+            headers.indices.forEach { sheet.setColumnWidth(it, 4000) }
             
             // Save to file
             val fileName = "BlotterReports_${System.currentTimeMillis()}.xlsx"
@@ -158,8 +158,9 @@ object ExportUtils {
                 createCell(1).setCellValue(pendingCases.toDouble())
             }
             
-            overviewSheet.autoSizeColumn(0)
-            overviewSheet.autoSizeColumn(1)
+            // Set column widths manually
+            overviewSheet.setColumnWidth(0, 6000)
+            overviewSheet.setColumnWidth(1, 4000)
             
             // Sheet 2: Cases by Type
             val typeSheet = workbook.createSheet("Cases by Type")
@@ -182,8 +183,9 @@ object ExportUtils {
                 }
             }
             
-            typeSheet.autoSizeColumn(0)
-            typeSheet.autoSizeColumn(1)
+            // Set column widths manually
+            typeSheet.setColumnWidth(0, 6000)
+            typeSheet.setColumnWidth(1, 4000)
             
             // Sheet 3: Cases by Status
             val statusSheet = workbook.createSheet("Cases by Status")
@@ -206,8 +208,9 @@ object ExportUtils {
                 }
             }
             
-            statusSheet.autoSizeColumn(0)
-            statusSheet.autoSizeColumn(1)
+            // Set column widths manually
+            statusSheet.setColumnWidth(0, 6000)
+            statusSheet.setColumnWidth(1, 4000)
             
             // Save to file
             val fileName = "Statistics_${System.currentTimeMillis()}.xlsx"
@@ -283,8 +286,8 @@ object ExportUtils {
                 row.createCell(6).setCellValue(if (officer.isAvailable) "Available" else "Unavailable")
             }
             
-            // Auto-size columns
-            headers.indices.forEach { sheet.autoSizeColumn(it) }
+            // Set column widths manually (autoSizeColumn doesn't work on Android)
+            headers.indices.forEach { sheet.setColumnWidth(it, 4000) }
             
             // Save to file
             val fileName = "OfficerPerformance_${System.currentTimeMillis()}.xlsx"

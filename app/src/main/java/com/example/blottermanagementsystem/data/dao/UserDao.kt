@@ -33,6 +33,6 @@ interface UserDao {
     @Query("SELECT COUNT(*) FROM users WHERE role = :role")
     suspend fun getUserCountByRole(role: String): Int
     
-    @Query("SELECT COUNT(*) FROM users WHERE role NOT IN ('Admin', 'Officer')")
+    @Query("SELECT COUNT(*) FROM users WHERE role NOT IN ('Admin', 'Officer') AND isActive = 1")
     suspend fun getTotalUserCount(): Int
 }

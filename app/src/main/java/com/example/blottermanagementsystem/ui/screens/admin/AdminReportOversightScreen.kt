@@ -20,6 +20,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.BlotterReport
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.AdminViewModel
+import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
+import com.example.blottermanagementsystem.utils.rememberDebouncedState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -29,26 +33,28 @@ import java.util.*
 fun AdminReportOversightScreen(
     onNavigateBack: () -> Unit,
     onNavigateToReportDetail: (Int) -> Unit,
-    adminViewModel: AdminViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel()
 ) {
-    val allReports by adminViewModel.allReports.collectAsState(initial = emptyList())
-    val officers by adminViewModel.allOfficers.collectAsState(initial = emptyList())
+    val allReports by viewModel.allReports.collectAsState(initial = emptyList())
+    val officers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     
     var filterStatus by remember { mutableStateOf("All") }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberDebouncedState("", delayMillis = 300)
     var selectedReport by remember { mutableStateOf<BlotterReport?>(null) }
     var showAssignDialog by remember { mutableStateOf(false) }
     
     val statusFilters = listOf("All", "Pending", "Assigned", "Under Investigation", "Resolved", "Closed")
     
-    val filteredReports = allReports.filter { report ->
+    val filteredReports = remember(allReports, filterStatus, searchQuery) { allReports.filter { report ->
         val matchesStatus = filterStatus == "All" || report.status == filterStatus
         val matchesSearch = searchQuery.isEmpty() || 
                            report.caseNumber.contains(searchQuery, ignoreCase = true) ||
                            report.complainantName.contains(searchQuery, ignoreCase = true)
         matchesStatus && matchesSearch
-    }
+    } }
+    
+    val paginationState = rememberPaginationState(filteredReports, pageSize = 20)
     
     Scaffold(
         topBar = {
@@ -146,10 +152,13 @@ fun AdminReportOversightScreen(
                     }
                 }
             } else {
+                val listState = LazyListOptimizer.rememberOptimizedLazyListState()
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    state = listState,
+                    contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
                 ) {
-                    items(filteredReports) { report ->
+                    items(paginationState.visibleItems, key = { it.id }) { report ->
                         AdminReportCard(
                             report = report,
                             onClick = { onNavigateToReportDetail(report.id) },
@@ -183,9 +192,9 @@ fun AdminReportOversightScreen(
                                     .fillMaxWidth()
                                     .clickable {
                                         scope.launch {
-                                            adminViewModel.assignOfficerToReport(
+                                            viewModel.assignOfficersToCase(
                                                 selectedReport!!.id,
-                                                officer.id
+                                                listOf(officer.userId ?: 0)
                                             )
                                             showAssignDialog = false
                                             selectedReport = null

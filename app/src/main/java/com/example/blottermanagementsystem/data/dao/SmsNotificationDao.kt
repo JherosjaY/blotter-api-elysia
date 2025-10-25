@@ -29,4 +29,7 @@ interface SmsNotificationDao {
     
     @Query("SELECT COUNT(*) FROM sms_notifications WHERE deliveryStatus = 'Failed'")
     suspend fun getFailedNotificationCount(): Int
+    
+    @Query("DELETE FROM sms_notifications WHERE id = :notificationId")
+    suspend fun deleteNotification(notificationId: Int)
 }

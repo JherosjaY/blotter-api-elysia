@@ -13,4 +13,11 @@ object SecurityUtils {
     fun verifyPassword(password: String, hashedPassword: String): Boolean {
         return hashPassword(password) == hashedPassword
     }
+    
+    /**
+     * Check if a password string is already hashed (SHA-256 = 64 hex characters)
+     */
+    fun isPasswordHashed(password: String): Boolean {
+        return password.length == 64 && password.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+    }
 }

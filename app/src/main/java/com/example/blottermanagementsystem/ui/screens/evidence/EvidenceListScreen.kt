@@ -17,6 +17,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.blottermanagementsystem.data.entity.Evidence
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.rememberPaginationState
+import com.example.blottermanagementsystem.utils.rememberOptimizedImageLoader
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,6 +33,8 @@ fun EvidenceListScreen(
     viewModel: DashboardViewModel = viewModel()
 ) {
     val evidenceList by viewModel.getEvidenceByReportId(reportId).collectAsState(initial = emptyList())
+    val paginationState = rememberPaginationState(evidenceList, pageSize = 15)
+    val imageLoader = rememberOptimizedImageLoader()
     
     Scaffold(
         topBar = {
@@ -99,14 +104,16 @@ fun EvidenceListScreen(
                 }
             }
         } else {
+            val listState = LazyListOptimizer.rememberOptimizedLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(LazyListOptimizer.OPTIMAL_CONTENT_PADDING),
+                verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
             ) {
-                items(evidenceList) { evidence ->
+                items(paginationState.visibleItems, key = { it.id }) { evidence ->
                     EvidenceCard(evidence)
                 }
             }

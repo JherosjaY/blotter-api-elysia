@@ -1,5 +1,6 @@
 package com.example.blottermanagementsystem.utils
 
+import android.content.Context
 import com.example.blottermanagementsystem.data.entity.ActivityLog
 import com.example.blottermanagementsystem.data.entity.Notification
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
@@ -8,7 +9,12 @@ import com.example.blottermanagementsystem.data.repository.BlotterRepository
  * Helper class to trigger notifications and activity logs together
  * This ensures realtime updates across the app
  */
-class NotificationHelper(private val repository: BlotterRepository) {
+class NotificationHelper(
+    private val repository: BlotterRepository,
+    private val context: Context? = null
+) {
+    private val pushNotificationManager: PushNotificationManager? = 
+        context?.let { PushNotificationManager(it) }
     
     /**
      * Notify when a new report is filed
@@ -31,6 +37,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
             timestamp = System.currentTimeMillis()
         )
         repository.insertNotification(notification)
+        
+        // Show push notification
+        pushNotificationManager?.notifyNewReport(caseNumber, reportedBy, reportId)
         
         // Log activity
         val activityLog = ActivityLog(
@@ -66,6 +75,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
             timestamp = System.currentTimeMillis()
         )
         repository.insertNotification(notification)
+        
+        // Show push notification
+        pushNotificationManager?.notifyStatusChange(caseNumber, newStatus, reportId)
         
         // Log activity
         val activityLog = ActivityLog(
@@ -103,6 +115,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
             timestamp = System.currentTimeMillis()
         )
         repository.insertNotification(officerNotification)
+        
+        // Show push notification to officer
+        pushNotificationManager?.notifyCaseAssignment(caseNumber, reportId)
         
         // Notify admin
         val adminNotification = Notification(
@@ -150,6 +165,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
                 timestamp = System.currentTimeMillis()
             )
             repository.insertNotification(notification)
+            
+            // Show push notification
+            pushNotificationManager?.notifyHearingScheduled(caseNumber, hearingDate, reportId)
         }
         
         // Log activity
@@ -186,6 +204,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
                 timestamp = System.currentTimeMillis()
             )
             repository.insertNotification(notification)
+            
+            // Show push notification
+            pushNotificationManager?.notifyCaseResolved(caseNumber, resolutionType, reportId)
         }
         
         // Log activity
@@ -222,6 +243,9 @@ class NotificationHelper(private val repository: BlotterRepository) {
             timestamp = System.currentTimeMillis()
         )
         repository.insertNotification(notification)
+        
+        // Show push notification
+        pushNotificationManager?.notifyEvidenceAdded(caseNumber, evidenceType, reportId)
         
         // Log activity
         val activityLog = ActivityLog(

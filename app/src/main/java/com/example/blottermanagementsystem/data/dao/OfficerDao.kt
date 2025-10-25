@@ -33,6 +33,6 @@ interface OfficerDao {
     @Delete
     suspend fun deleteOfficer(officer: Officer)
     
-    @Query("SELECT COUNT(*) FROM officers")
+    @Query("SELECT COUNT(*) FROM officers WHERE isAvailable = 1")
     suspend fun getOfficerCount(): Int
 }

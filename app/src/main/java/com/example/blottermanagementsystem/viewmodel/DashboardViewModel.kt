@@ -1,13 +1,13 @@
 package com.example.blottermanagementsystem.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
-import com.example.blottermanagementsystem.data.entity.BlotterReport
-import com.example.blottermanagementsystem.data.entity.Notification
-import com.example.blottermanagementsystem.data.entity.ActivityLog
+import com.example.blottermanagementsystem.data.entity.*
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import com.example.blottermanagementsystem.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -44,13 +44,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         respondentStatementDao = database.respondentStatementDao(),
         summonsDao = database.summonsDao(),
         kpFormDao = database.kpFormDao(),
-        mediationSessionDao = database.mediationSessionDao()
+        mediationSessionDao = database.mediationSessionDao(),
+        caseTimelineDao = database.caseTimelineDao(),
+        caseTemplateDao = database.caseTemplateDao()
     )
     
     private val _dashboardStats = MutableStateFlow(DashboardStats())
     val dashboardStats: StateFlow<DashboardStats> = _dashboardStats
     
-    val allReports: Flow<List<BlotterReport>> = repository.getAllActiveReports()
+    private val _allReports = MutableStateFlow<List<BlotterReport>>(emptyList())
+    val allReports: StateFlow<List<BlotterReport>> = _allReports
+    
+    val allUsers: Flow<List<User>> = repository.getAllUsers()
     
     private val _recentReports = MutableStateFlow<List<BlotterReport>>(emptyList())
     val recentReports: StateFlow<List<BlotterReport>> = _recentReports
@@ -58,11 +63,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         loadDashboardStats()
         loadRecentReports()
+        loadAllReports()
+    }
+    
+    private fun loadAllReports() {
+        viewModelScope.launch {
+            try {
+                // Load from local Room database - collect ONCE
+                Log.d("DashboardViewModel", "Fetching all reports from local database...")
+                _allReports.value = repository.getAllActiveReports().first()
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "Error loading reports", e)
+                _allReports.value = emptyList()
+            }
+        }
     }
     
     private fun loadDashboardStats() {
         viewModelScope.launch {
             try {
+                // Load stats from local Room database
                 val totalReports = repository.getActiveReportCount()
                 val pendingReports = repository.getReportCountByStatus("Pending")
                 val ongoingReports = repository.getReportCountByStatus("Under Investigation")
@@ -81,15 +101,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     totalUsers = totalUsers
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("DashboardViewModel", "Error loading stats: ${e.message}")
             }
         }
     }
     
+    
     private fun loadRecentReports() {
         viewModelScope.launch {
-            repository.getAllActiveReports().collect { reports ->
+            try {
+                val reports = repository.getAllActiveReports().first()
                 _recentReports.value = reports.take(5)
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "Error loading recent reports", e)
+                _recentReports.value = emptyList()
             }
         }
     }
@@ -125,7 +150,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         loadRecentReports()
     }
     
+    // Add refresh function for pull-to-refresh
+    fun refreshDashboard() {
+        loadDashboardStats()
+        loadRecentReports()
+        loadAllReports()
+    }
+    
     suspend fun insertReport(report: BlotterReport, createdBy: String, creatorUserId: Int = 0): Long {
+        // Save to local Room database
         val reportId = repository.insertReport(report)
         
         // Log activity
@@ -163,6 +196,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     suspend fun updateReport(report: BlotterReport, updatedBy: String, oldStatus: String? = null) {
+        // Update local Room database
         repository.updateReport(report)
         
         // Log activity
@@ -207,6 +241,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     suspend fun deleteReport(report: BlotterReport, deletedBy: String) {
+        // Delete from local Room database
         repository.deleteReport(report)
         
         // Log activity
@@ -242,11 +277,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // Witness Management
     suspend fun addWitness(witness: com.example.blottermanagementsystem.data.entity.Witness, addedBy: String, caseNumber: String, userRole: String = "") {
-        // Backend validation: Only Officer and Clerk can add witnesses
+        // Prevent admins from adding witnesses
         if (userRole == "Admin") {
             throw SecurityException("Admins cannot add witnesses. This action is restricted to Officers and Clerks.")
         }
         
+        // Save to local Room database
         repository.insertWitness(witness)
         
         // Log activity
@@ -268,6 +304,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             throw SecurityException("Admins cannot add suspects. This action is restricted to Officers and Clerks.")
         }
         
+        // Save to local Room database
         repository.insertSuspect(suspect)
         
         // Log activity
@@ -289,6 +326,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             throw SecurityException("Admins cannot add evidence. This action is restricted to Officers and Clerks.")
         }
         
+        // Save to local Room database
         repository.insertEvidence(evidence)
         
         // Log activity
@@ -305,6 +343,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // Hearing Management
     suspend fun addHearing(hearing: com.example.blottermanagementsystem.data.entity.Hearing, scheduledBy: String, caseNumber: String) {
+        // Save to local Room database
         repository.insertHearing(hearing)
         
         // Log activity
@@ -321,6 +360,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // Resolution Management
     suspend fun addResolution(resolution: com.example.blottermanagementsystem.data.entity.Resolution, addedBy: String, caseNumber: String) {
+        // Save to local Room database
         repository.insertResolution(resolution)
         
         // Log activity
@@ -340,6 +380,52 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // All Hearings
     fun getAllHearings() = repository.getAllHearings()
+    
+    // Assign multiple officers to case
+    fun assignOfficersToCase(reportId: Int, officerIds: List<Int>) {
+        viewModelScope.launch {
+            try {
+                val report = repository.getReportById(reportId)
+                if (report != null) {
+                    val officerIdsString = officerIds.joinToString(",")
+                    val updatedReport = report.copy(
+                        assignedOfficerIds = officerIdsString,
+                        status = if (report.status == "Pending") "Assigned" else report.status
+                    )
+                    repository.updateReport(updatedReport)
+                    
+                    // Log activity
+                    logActivity(
+                        activityType = "Officers Assigned",
+                        description = "Officers assigned to case ${report.caseNumber}",
+                        performedBy = "Admin",
+                        caseId = report.id,
+                        caseTitle = report.caseNumber
+                    )
+                    
+                    // Notify each officer
+                    officerIds.forEach { officerId ->
+                        try {
+                            val notification = com.example.blottermanagementsystem.data.entity.Notification(
+                                userId = officerId,
+                                title = "New Case Assigned",
+                                message = "You have been assigned to case ${report.caseNumber}",
+                                type = "CASE_ASSIGNED",
+                                caseId = report.id,
+                                isRead = false,
+                                timestamp = System.currentTimeMillis()
+                            )
+                            repository.insertNotification(notification)
+                        } catch (e: Exception) {
+                            Log.e("DashboardViewModel", "Failed to notify officer $officerId: ${e.message}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "Failed to assign officers: ${e.message}")
+            }
+        }
+    }
     
     // Assign officer to report with notification
     suspend fun assignOfficerToReport(
@@ -403,9 +489,155 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 performedBy = performedBy,
                 timestamp = System.currentTimeMillis()
             )
+            
+            // ⚡ Try API first (sync activity log to cloud)
+            try {
+                Log.d("DashboardViewModel", "Logging activity to API...")
+                val logData = mapOf(
+                    "case_id" to (caseId?.toString() ?: ""),
+                    "case_title" to (caseTitle ?: ""),
+                    "activity_type" to activityType,
+                    "description" to description,
+                    "old_value" to (oldValue ?: ""),
+                    "new_value" to (newValue ?: ""),
+                    "performed_by" to performedBy,
+                    "timestamp" to activityLog.timestamp.toString()
+                )
+                // Note: API endpoint for activity logs needs to be added to backend
+                // For now, just log locally
+                Log.d("DashboardViewModel", "Activity log ready for API sync")
+            } catch (e: Exception) {
+                Log.w("DashboardViewModel", "API logging skipped: ${e.message}")
+            }
+            
+            // Always save to local Room database (backup + offline support)
             repository.insertActivityLog(activityLog)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+    
+    // Case Timeline operations
+    fun getCaseTimeline(reportId: Int) = repository.getTimelineByReportId(reportId)
+    
+    suspend fun addTimelineEvent(
+        reportId: Int,
+        eventType: String,
+        eventTitle: String,
+        eventDescription: String,
+        performedBy: String,
+        performedByRole: String
+    ) {
+        val event = com.example.blottermanagementsystem.data.entity.CaseTimeline(
+            blotterReportId = reportId,
+            eventType = eventType,
+            eventTitle = eventTitle,
+            eventDescription = eventDescription,
+            performedBy = performedBy,
+            performedByRole = performedByRole
+        )
+        repository.insertTimelineEvent(event)
+    }
+    
+    // Case Template operations
+    fun getAllTemplates() = repository.getAllActiveTemplates()
+    
+    suspend fun getTemplateById(templateId: Int) = repository.getTemplateById(templateId)
+    
+    suspend fun useTemplate(templateId: Int) {
+        repository.incrementTemplateUsage(templateId)
+    }
+    
+    // User Management
+    suspend fun toggleUserStatus(userId: Int) {
+        val user = repository.getUserById(userId)
+        user?.let {
+            val updatedUser = it.copy(isActive = !it.isActive)
+            repository.updateUser(updatedUser)
+        }
+    }
+    
+    suspend fun deleteUser(userId: Int) {
+        val user = repository.getUserById(userId)
+        user?.let {
+            repository.deleteUser(it)
+        }
+    }
+    
+    // Officer Management (Admin functions)
+    suspend fun createOfficerAccount(
+        firstName: String,
+        lastName: String,
+        username: String,
+        tempPassword: String,
+        badgeNumber: String
+    ): Int {
+        val hashedPassword = com.example.blottermanagementsystem.utils.SecurityUtils.hashPassword(tempPassword)
+        
+        val newUser = com.example.blottermanagementsystem.data.entity.User(
+            firstName = firstName,
+            lastName = lastName,
+            username = username,
+            password = hashedPassword,
+            role = "Officer",
+            profileCompleted = false,
+            mustChangePassword = true,
+            badgeNumber = badgeNumber,
+            isActive = true
+        )
+        
+        return repository.insertUser(newUser).toInt()
+    }
+    
+    suspend fun addOfficer(officer: com.example.blottermanagementsystem.data.entity.Officer) {
+        repository.insertOfficer(officer)
+        refreshStats()
+    }
+    
+    suspend fun deleteOfficerById(officerId: Int) {
+        val allOfficers = repository.getAllOfficersSync()
+        val officer = allOfficers.find { it.id == officerId }
+        officer?.let {
+            repository.deleteOfficer(it)
+            refreshStats()
+        }
+    }
+    
+    suspend fun getAssignedOfficerIds(reportId: Int): List<Int> {
+        val report = repository.getReportById(reportId)
+        return report?.assignedOfficerIds
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?: emptyList()
+    }
+    
+    suspend fun updateReportStatus(
+        reportId: Int,
+        newStatus: String,
+        notes: String,
+        userId: Int
+    ) {
+        val report = repository.getReportById(reportId)
+        report?.let {
+            val updatedReport = it.copy(status = newStatus)
+            repository.updateReport(updatedReport)
+            
+            logActivity(
+                activityType = "Status Updated",
+                description = "Case ${it.caseNumber} status changed to $newStatus. Notes: $notes",
+                performedBy = "User $userId",
+                caseId = reportId,
+                caseTitle = it.caseNumber
+            )
+            
+            refreshStats()
+        }
+    }
+    
+    suspend fun addResolution(resolution: com.example.blottermanagementsystem.data.entity.Resolution) {
+        repository.insertResolution(resolution)
+        refreshStats()
+    }
 }
+
+

@@ -29,9 +29,13 @@ import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import com.example.blottermanagementsystem.data.entity.BlotterReport
 import com.example.blottermanagementsystem.ui.components.DashboardTopBar
+import com.example.blottermanagementsystem.ui.screens.reports.ReportCard
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
+import com.example.blottermanagementsystem.viewmodel.NotificationViewModel
 import com.example.blottermanagementsystem.utils.ExportUtils
+import com.example.blottermanagementsystem.utils.LazyListOptimizer
+import com.example.blottermanagementsystem.utils.PreferencesManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -48,21 +52,28 @@ fun EnhancedOfficerDashboardScreen(
     onNavigateToReportDetail: (Int) -> Unit,
     onNavigateToQRScanner: () -> Unit = {},
     onNavigateToAnalytics: () -> Unit = {},
+    onNavigateToSmsNotifications: () -> Unit = {},
     onLogout: () -> Unit = {},
-    viewModel: DashboardViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel(),
+    notificationViewModel: NotificationViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val preferencesManager = remember { PreferencesManager(context) }
+    val userId = preferencesManager.userId
+    
     val assignedReports by viewModel.getReportsByOfficerId(officerId).collectAsState(initial = emptyList())
+    val notifications by notificationViewModel.getNotificationsByUser(userId).collectAsState(initial = emptyList())
+    val unreadCount = remember(notifications) { notifications.count { !it.isRead } }
+    
+    val pendingCount = remember(assignedReports) { assignedReports.count { it.status == "Pending" || it.status == "Assigned" } }
+    val ongoingCount = remember(assignedReports) { assignedReports.count { it.status == "Under Investigation" } }
+    val resolvedCount = remember(assignedReports) { assignedReports.count { it.status == "Resolved" } }
+    val urgentCases = remember(assignedReports) { assignedReports.filter { 
+        (it.status == "Pending" || it.status == "Assigned") && (System.currentTimeMillis() - it.dateFiled) > 86400000 // > 24 hours
+    } }
     
     var isExporting by remember { mutableStateOf(false) }
-    
-    val pendingCount = assignedReports.count { it.status == "Pending" || it.status == "Assigned" }
-    val ongoingCount = assignedReports.count { it.status == "Under Investigation" }
-    val resolvedCount = assignedReports.count { it.status == "Resolved" }
-    val urgentCases = assignedReports.filter { 
-        (it.status == "Pending" || it.status == "Assigned") && (System.currentTimeMillis() - it.dateFiled) > 86400000 // > 24 hours
-    }
 
     Scaffold(
         topBar = {
@@ -70,20 +81,43 @@ fun EnhancedOfficerDashboardScreen(
                 title = "Officer Dashboard",
                 subtitle = "Case Management",
                 firstName = officerName,
-                notificationCount = urgentCases.size,
+                notificationCount = unreadCount,
                 onNavigateToNotifications = onNavigateToNotifications,
                 onNavigateToProfile = onNavigateToProfile
             )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
+        val listState = LazyListOptimizer.rememberOptimizedLazyListState()
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(
+                start = LazyListOptimizer.OPTIMAL_CONTENT_PADDING,
+                end = LazyListOptimizer.OPTIMAL_CONTENT_PADDING,
+                top = LazyListOptimizer.OPTIMAL_CONTENT_PADDING,
+                bottom = 0.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(LazyListOptimizer.OPTIMAL_ITEM_SPACING)
         ) {
+            // Welcome Header
+            item {
+                Text(
+                    text = "Welcome, $officerName!",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Here's your case overview",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
             // Animated "Overview" Header with boundary lines
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -200,13 +234,23 @@ fun EnhancedOfficerDashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     OfficerActionCard(
-                        title = "Analytics",
-                        icon = Icons.Default.BarChart,
-                        onClick = onNavigateToAnalytics,
-                        color = WarningOrange,
+                        title = "SMS Notifications",
+                        icon = Icons.Default.Sms,
+                        onClick = onNavigateToSmsNotifications,
+                        color = InfoBlue,
                         modifier = Modifier.weight(1f)
                     )
                 }
+            }
+            
+            item {
+                OfficerActionCard(
+                    title = "Analytics",
+                    icon = Icons.Default.BarChart,
+                    onClick = onNavigateToAnalytics,
+                    color = WarningOrange,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
             
             // Export My Cases
@@ -266,15 +310,11 @@ fun EnhancedOfficerDashboardScreen(
                 }
             } else {
                 items(assignedReports.take(5)) { report ->
-                    com.example.blottermanagementsystem.ui.screens.dashboard.RecentReportCard(
+                    ReportCard(
                         report = report,
                         onClick = { onNavigateToReportDetail(report.id) }
                     )
                 }
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }

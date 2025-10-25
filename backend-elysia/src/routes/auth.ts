@@ -30,15 +30,23 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Account is inactive" };
       }
 
+      // Generate simple token (in production, use JWT)
+      const token = Buffer.from(`${user.id}:${user.username}:${Date.now()}`).toString('base64');
+
       return {
         success: true,
+        message: "Login successful",
         data: {
-          id: user.id,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          profilePhotoUri: user.profilePhotoUri,
+          user: {
+            id: user.id,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            profilePhotoUri: user.profilePhotoUri,
+            profileCompleted: user.profileCompleted,
+          },
+          token: token,
         },
       };
     },
@@ -50,11 +58,11 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     }
   )
 
-  // Register
+  // Register (Public - User role only)
   .post(
     "/register",
     async ({ body, set }) => {
-      const { username, password, firstName, lastName, role } = body;
+      const { username, password, firstName, lastName } = body;
 
       // Check if username exists
       const existingUser = await db.query.users.findFirst({
@@ -66,26 +74,38 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Username already exists" };
       }
 
-      // TODO: Add password hashing (bcrypt)
+      // Public registration always creates "User" role
+      // Officers and Admins must be created by Admin through user management
       const [newUser] = await db
         .insert(users)
         .values({
           username,
-          password, // Should be hashed
+          password, // TODO: Add password hashing (bcrypt)
           firstName,
           lastName,
-          role,
+          role: "User", // Force User role for public registration
+          isActive: true,
+          profileCompleted: false,
+          mustChangePassword: false,
         })
         .returning();
 
+      // Generate token
+      const token = Buffer.from(`${newUser.id}:${newUser.username}:${Date.now()}`).toString('base64');
+
       return {
         success: true,
+        message: "Registration successful",
         data: {
-          id: newUser.id,
-          username: newUser.username,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          role: newUser.role,
+          user: {
+            id: newUser.id,
+            username: newUser.username,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            role: newUser.role,
+            profileCompleted: newUser.profileCompleted,
+          },
+          token: token,
         },
       };
     },
@@ -95,7 +115,6 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         password: t.String(),
         firstName: t.String(),
         lastName: t.String(),
-        role: t.String(),
       }),
     }
   );

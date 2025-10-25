@@ -32,12 +32,19 @@ fun AddRespondentScreen(
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var contactNumber by remember { mutableStateOf("") }
+    var contactError by remember { mutableStateOf<String?>(null) }
     var address by remember { mutableStateOf("") }
     var accusation by remember { mutableStateOf("") }
     var relationship by remember { mutableStateOf("") }
     var hasEvidence by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    
+    // Phone validation function
+    fun validatePhoneNumber(phone: String): Boolean {
+        val pattern09 = "^09\\d{9}$".toRegex()
+        return pattern09.matches(phone)
+    }
     
     val scope = rememberCoroutineScope()
     
@@ -121,15 +128,41 @@ fun AddRespondentScreen(
             
             OutlinedTextField(
                 value = contactNumber,
-                onValueChange = { contactNumber = it },
+                onValueChange = { 
+                    contactNumber = it
+                    contactError = if (it.isNotBlank() && !validatePhoneNumber(it)) {
+                        when {
+                            !it.startsWith("09") -> "Must start with 09"
+                            it.length < 11 -> "Need ${11 - it.length} more digit(s)"
+                            it.length > 11 -> "Too long (max 11 digits)"
+                            else -> "Invalid format"
+                        }
+                    } else null
+                },
                 label = { Text("Contact Number") },
                 placeholder = { Text("09XXXXXXXXX") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),
+                isError = contactError != null,
+                supportingText = {
+                    if (contactError != null) {
+                        Text(
+                            text = contactError!!,
+                            color = ErrorRed,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Format: 09XXXXXXXXX (11 digits)",
+                            fontSize = 12.sp
+                        )
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = ElectricBlue,
                     focusedLabelColor = ElectricBlue,
-                    cursorColor = ElectricBlue
+                    cursorColor = ElectricBlue,
+                    errorBorderColor = ErrorRed
                 ),
                 singleLine = true,
                 leadingIcon = {
