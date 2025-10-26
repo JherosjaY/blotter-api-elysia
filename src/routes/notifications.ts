@@ -417,6 +417,105 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         message: t.String(),
       }),
     }
+  )
+
+  // Send FCM Notification to bulk users (manual notification)
+  .post(
+    "/fcm/send-bulk",
+    async ({ body, set }) => {
+      try {
+        const { title, message, recipientType, specificUserIds } = body;
+
+        // Get users based on recipient type
+        let targetUsers;
+        
+        if (recipientType === "Specific Users" && specificUserIds && specificUserIds.length > 0) {
+          // Get specific users
+          targetUsers = await db
+            .select()
+            .from(users)
+            .where(eq(users.isActive, true));
+          targetUsers = targetUsers.filter(user => specificUserIds.includes(user.id));
+        } else {
+          // Get all active users
+          targetUsers = await db
+            .select()
+            .from(users)
+            .where(eq(users.isActive, true));
+          
+          // Filter by role
+          if (recipientType === "All Users") {
+            targetUsers = targetUsers.filter(user => user.role === "User");
+          } else if (recipientType === "All Admins") {
+            targetUsers = targetUsers.filter(user => user.role === "Admin");
+          } else if (recipientType === "All Officers") {
+            targetUsers = targetUsers.filter(user => user.role === "Officer");
+          }
+        }
+
+        const tokens = targetUsers
+          .filter(user => user.fcmToken)
+          .map(user => user.fcmToken as string);
+
+        if (tokens.length === 0) {
+          return {
+            success: true,
+            message: "No devices with FCM tokens found, but in-app notifications were created",
+            data: {
+              successCount: 0,
+              failureCount: 0,
+              totalDevices: 0,
+            },
+          };
+        }
+
+        // Send to multiple devices
+        const fcmMessage = {
+          notification: {
+            title: title,
+            body: message,
+          },
+          data: {
+            type: "ANNOUNCEMENT",
+            timestamp: new Date().toISOString(),
+          },
+          tokens: tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(fcmMessage);
+
+        console.log(`✅ FCM bulk notification sent to ${response.successCount} devices`);
+        console.log(`❌ Failed: ${response.failureCount}`);
+        console.log(`📋 Recipient type: ${recipientType}`);
+
+        return {
+          success: true,
+          message: "Notifications sent successfully",
+          data: {
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+            totalDevices: tokens.length,
+            recipientType,
+          },
+        };
+      } catch (error: any) {
+        console.error("❌ FCM send-bulk error:", error);
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to send notifications",
+          error: error.message,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        title: t.String(),
+        message: t.String(),
+        recipientType: t.String(),
+        specificUserIds: t.Optional(t.Array(t.Number())),
+      }),
+    }
   );
 
 // Helper functions
