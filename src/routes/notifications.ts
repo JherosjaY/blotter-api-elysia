@@ -417,7 +417,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         message: t.String(),
       }),
     }
-  });
+  );
 
 // Helper functions
 function getNotificationTitle(type: string): string {
