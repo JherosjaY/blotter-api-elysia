@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 export const authRoutes = new Elysia({ prefix: "/auth" })
   // Login
@@ -19,8 +20,9 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Invalid credentials" };
       }
 
-      // TODO: Add password hashing verification (bcrypt)
-      if (user.password !== password) {
+      // Verify password with bcrypt
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
         set.status = 401;
         return { success: false, message: "Invalid credentials" };
       }
@@ -58,11 +60,11 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     }
   )
 
-  // Register (Public - User role only)
+  // Register (Public - User role only, but accepts role parameter for admin/officer creation)
   .post(
     "/register",
     async ({ body, set }) => {
-      const { username, password, firstName, lastName } = body;
+      const { username, password, firstName, lastName, role } = body;
 
       // Check if username exists
       const existingUser = await db.query.users.findFirst({
@@ -74,16 +76,20 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Username already exists" };
       }
 
-      // Public registration always creates "User" role
-      // Officers and Admins must be created by Admin through user management
+      // Hash password with bcrypt
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Use provided role or default to "User" for public registration
+      const userRole = role || "User";
+      
       const [newUser] = await db
         .insert(users)
         .values({
           username,
-          password, // TODO: Add password hashing (bcrypt)
+          password: hashedPassword,
           firstName,
           lastName,
-          role: "User", // Force User role for public registration
+          role: userRole,
           isActive: true,
           profileCompleted: false,
           mustChangePassword: false,
@@ -115,6 +121,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         password: t.String(),
         firstName: t.String(),
         lastName: t.String(),
+        role: t.Optional(t.String()),
       }),
     }
   );
