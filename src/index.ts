@@ -20,6 +20,7 @@ import { hearingsRoutes } from "./routes/hearings";
 import { resolutionsRoutes } from "./routes/resolutions";
 import { activityLogsRoutes } from "./routes/activityLogs";
 import { notificationsRoutes } from "./routes/notifications";
+import { respondentsRoutes } from "./routes/respondents";
 
 export const app = new Elysia()
   .use(
@@ -59,6 +60,7 @@ export const app = new Elysia()
       resolutions: "/api/resolutions",
       activityLogs: "/api/activity-logs",
       notifications: "/api/notifications",
+      respondents: "/api/respondents",
     },
   }))
   .get("/health", () => ({
@@ -82,6 +84,7 @@ export const app = new Elysia()
       .use(resolutionsRoutes)
       .use(activityLogsRoutes)
       .use(notificationsRoutes)
+      .use(respondentsRoutes)
   )
   .listen(process.env.PORT || 3000);
 
