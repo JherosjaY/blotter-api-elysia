@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { blotterReports, notifications } from "../db/schema";
+import { blotterReports, notifications, users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import admin from "firebase-admin";
 
 export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
   // Send Email Notification
@@ -252,6 +253,169 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         message: "Failed to get audio recording",
         error: error.message,
       };
+    }
+  })
+
+  // Get Connected Devices (users with FCM tokens)
+  .get("/devices", async () => {
+    try {
+      const connectedUsers = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          username: users.username,
+          role: users.role,
+          fcmToken: users.fcmToken,
+          deviceId: users.deviceId,
+          updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .where(eq(users.isActive, true));
+
+      // Filter users with FCM tokens
+      const devicesWithTokens = connectedUsers.filter(user => user.fcmToken);
+
+      return {
+        success: true,
+        devices: devicesWithTokens,
+        count: devicesWithTokens.length,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to get connected devices",
+        error: error.message,
+      };
+    }
+  })
+
+  // Send FCM Notification to specific user
+  .post(
+    "/fcm/send",
+    async ({ body, set }) => {
+      try {
+        const { userId, title, message } = body;
+
+        // Get user's FCM token
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (!user || !user.fcmToken) {
+          set.status = 404;
+          return {
+            success: false,
+            message: "User or FCM token not found",
+          };
+        }
+
+        // Send FCM notification
+        const fcmMessage = {
+          notification: {
+            title: title,
+            body: message,
+          },
+          token: user.fcmToken,
+        };
+
+        const response = await admin.messaging().send(fcmMessage);
+
+        console.log(`✅ FCM notification sent to ${user.firstName} ${user.lastName}`);
+        console.log(`Response: ${response}`);
+
+        return {
+          success: true,
+          message: "Notification sent successfully",
+          data: {
+            userId,
+            userName: `${user.firstName} ${user.lastName}`,
+            messageId: response,
+          },
+        };
+      } catch (error: any) {
+        console.error("❌ FCM send error:", error);
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to send notification",
+          error: error.message,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        userId: t.Number(),
+        title: t.String(),
+        message: t.String(),
+      }),
+    }
+  )
+
+  // Send FCM Notification to all users
+  .post(
+    "/fcm/send-all",
+    async ({ body, set }) => {
+      try {
+        const { title, message } = body;
+
+        // Get all users with FCM tokens
+        const usersWithTokens = await db
+          .select()
+          .from(users)
+          .where(eq(users.isActive, true));
+
+        const tokens = usersWithTokens
+          .filter(user => user.fcmToken)
+          .map(user => user.fcmToken as string);
+
+        if (tokens.length === 0) {
+          return {
+            success: false,
+            message: "No devices with FCM tokens found",
+          };
+        }
+
+        // Send to multiple devices
+        const fcmMessage = {
+          notification: {
+            title: title,
+            body: message,
+          },
+          tokens: tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(fcmMessage);
+
+        console.log(`✅ FCM notification sent to ${response.successCount} devices`);
+        console.log(`❌ Failed: ${response.failureCount}`);
+
+        return {
+          success: true,
+          message: "Notifications sent",
+          data: {
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+            totalDevices: tokens.length,
+          },
+        };
+      } catch (error: any) {
+        console.error("❌ FCM send-all error:", error);
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to send notifications",
+          error: error.message,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        title: t.String(),
+        message: t.String(),
+      }),
     }
   });
 
