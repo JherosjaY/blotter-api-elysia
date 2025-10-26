@@ -142,4 +142,53 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         role: t.Optional(t.String()),
       }),
     }
+  )
+  
+  // Update User Profile (Profile Photo & Completion)
+  .put(
+    "/profile/:userId",
+    async ({ params, body, set }) => {
+      try {
+        const userId = parseInt(params.userId);
+        const { profilePhotoUri, profileCompleted } = body;
+
+        // Update user profile
+        const [updatedUser] = await db
+          .update(users)
+          .set({
+            profilePhotoUri: profilePhotoUri,
+            profileCompleted: profileCompleted ?? true,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+          .returning();
+
+        if (!updatedUser) {
+          set.status = 404;
+          return {
+            success: false,
+            message: "User not found",
+          };
+        }
+
+        return {
+          success: true,
+          message: "Profile updated successfully",
+          user: updatedUser,
+        };
+      } catch (error: any) {
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to update profile",
+          error: error.message,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        profilePhotoUri: t.String(),
+        profileCompleted: t.Optional(t.Boolean()),
+      }),
+    }
   );
