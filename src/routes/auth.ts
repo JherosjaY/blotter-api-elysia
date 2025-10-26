@@ -20,8 +20,26 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Invalid credentials" };
       }
 
-      // Verify password with bcrypt
-      const passwordMatch = await bcrypt.compare(password, user.password);
+      // Verify password (support both bcrypt and plain text for migration)
+      let passwordMatch = false;
+      
+      // Check if password is hashed (bcrypt hashes start with $2b$)
+      if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
+        // Bcrypt hashed password
+        passwordMatch = await bcrypt.compare(password, user.password);
+      } else {
+        // Plain text password (old users)
+        passwordMatch = user.password === password;
+        
+        // If login successful, upgrade to bcrypt
+        if (passwordMatch) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await db.update(users)
+            .set({ password: hashedPassword })
+            .where(eq(users.id, user.id));
+        }
+      }
+      
       if (!passwordMatch) {
         set.status = 401;
         return { success: false, message: "Invalid credentials" };
