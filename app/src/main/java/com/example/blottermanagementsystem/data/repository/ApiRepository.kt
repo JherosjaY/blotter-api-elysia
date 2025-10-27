@@ -186,41 +186,49 @@ class ApiRepository {
     
     suspend fun createReport(report: BlotterReport): Result<BlotterReport> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "🌐 API Create Report - Calling: ${report.caseNumber}")
             val response = apiService.createReport(report)
             
             if (response.isSuccessful && response.body()?.success == true) {
                 val createdReport = response.body()?.data
                 if (createdReport != null) {
-                    Result.success(createdReport)
+                    Log.d(TAG, "✅ Report created successfully: ${createdReport.id}")
+                    return@withContext Result.success(createdReport)
                 } else {
-                    Result.failure(Exception("Created report is null"))
+                    Log.e(TAG, "❌ Created report is null")
+                    return@withContext Result.failure(Exception("Created report is null"))
                 }
             } else {
-                Result.failure(Exception("Failed to create report"))
+                Log.e(TAG, "❌ Failed to create report: ${response.code()}")
+                return@withContext Result.failure(Exception("Failed to create report: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Create report error: ${e.message}", e)
-            Result.failure(e)
+            Log.e(TAG, "❌ Create report error: ${e.message}", e)
+            return@withContext Result.failure(e)
         }
     }
     
     suspend fun updateReport(id: Int, report: BlotterReport): Result<BlotterReport> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "🌐 API Update Report - ID: $id")
             val response = apiService.updateReport(id, report)
             
             if (response.isSuccessful && response.body()?.success == true) {
                 val updatedReport = response.body()?.data
                 if (updatedReport != null) {
-                    Result.success(updatedReport)
+                    Log.d(TAG, "✅ Report updated successfully: $id")
+                    return@withContext Result.success(updatedReport)
                 } else {
-                    Result.failure(Exception("Updated report is null"))
+                    Log.e(TAG, "❌ Updated report is null")
+                    return@withContext Result.failure(Exception("Updated report is null"))
                 }
             } else {
-                Result.failure(Exception("Failed to update report"))
+                Log.e(TAG, "❌ Failed to update report: ${response.code()}")
+                return@withContext Result.failure(Exception("Failed to update report: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Update report error: ${e.message}", e)
-            Result.failure(e)
+            Log.e(TAG, "❌ Update report error: ${e.message}", e)
+            return@withContext Result.failure(e)
         }
     }
     
