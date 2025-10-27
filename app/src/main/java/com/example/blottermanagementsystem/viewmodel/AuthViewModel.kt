@@ -452,8 +452,20 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 // Update local database
                 repository.updateUser(updatedUser)
                 
-                // TODO: Sync to cloud
-                // apiRepository.updateUserProfile(userId, profileCompleted = true)
+                // Sync to cloud
+                viewModelScope.launch {
+                    try {
+                        Log.d("AuthViewModel", "📤 Syncing profile completion to cloud...")
+                        val result = apiRepository.updateUser(userId, updatedUser)
+                        if (result.isSuccess) {
+                            Log.d("AuthViewModel", "✅ Profile completion synced to cloud")
+                        } else {
+                            Log.e("AuthViewModel", "❌ Failed to sync profile completion to cloud")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("AuthViewModel", "❌ Error syncing profile completion: ${e.message}", e)
+                    }
+                }
                 
                 Log.d("AuthViewModel", "✅ Profile marked as completed for user $userId")
             }

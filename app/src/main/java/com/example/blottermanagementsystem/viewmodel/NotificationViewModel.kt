@@ -258,11 +258,21 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                 Log.d("NotificationVM", "📤 Sending notification to user $userId...")
                 _sendStatus.value = "Sending..."
                 
-                // TODO: Add API call to send FCM
-                // apiRepository.sendFCMNotification(userId, title, message)
+                // Send FCM notification via API
+                val result = apiRepository.sendBulkFCMNotification(
+                    title = title,
+                    message = message,
+                    recipientType = "specific",
+                    specificUserIds = listOf(userId)
+                )
                 
-                _sendStatus.value = "✅ Notification sent!"
-                Log.d("NotificationVM", "✅ Notification sent successfully")
+                if (result.isSuccess) {
+                    _sendStatus.value = "✅ Notification sent!"
+                    Log.d("NotificationVM", "✅ Notification sent successfully to user $userId")
+                } else {
+                    _sendStatus.value = "❌ Failed to send"
+                    Log.e("NotificationVM", "❌ Failed to send notification: ${result.exceptionOrNull()?.message}")
+                }
                 
                 // Clear status after 2 seconds
                 kotlinx.coroutines.delay(2000)
@@ -283,11 +293,20 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                 Log.d("NotificationVM", "📤 Sending notification to all users...")
                 _sendStatus.value = "Sending to all..."
                 
-                // TODO: Add API call to send FCM to all
-                // apiRepository.sendFCMNotificationToAll(title, message)
+                // Send FCM notification to all via API
+                val result = apiRepository.sendBulkFCMNotification(
+                    title = title,
+                    message = message,
+                    recipientType = "all"
+                )
                 
-                _sendStatus.value = "✅ Sent to all!"
-                Log.d("NotificationVM", "✅ Notification sent to all users")
+                if (result.isSuccess) {
+                    _sendStatus.value = "✅ Sent to all!"
+                    Log.d("NotificationVM", "✅ Notification sent to all users")
+                } else {
+                    _sendStatus.value = "❌ Failed to send"
+                    Log.e("NotificationVM", "❌ Failed to send notification: ${result.exceptionOrNull()?.message}")
+                }
                 
                 // Clear status after 2 seconds
                 kotlinx.coroutines.delay(2000)
