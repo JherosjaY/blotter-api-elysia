@@ -686,27 +686,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             Log.e("DashboardViewModel", "❌ Failed to notify user about hearing: ${e.message}", e)
         }
         
-        // Notify assigned officers
+        // Notify all admins about hearing
         try {
-            val report = repository.getReportById(hearing.blotterReportId)
-            if (report != null && report.assignedOfficerIds.isNotEmpty()) {
-                val officerIds = report.assignedOfficerIds.split(",").mapNotNull { it.trim().toIntOrNull() }
-                officerIds.forEach { officerId ->
-                    val officerNotification = com.example.blottermanagementsystem.data.entity.Notification(
-                        userId = officerId,
-                        title = "Hearing Scheduled",
-                        message = "Hearing scheduled for case $caseNumber on ${hearing.hearingDate} at ${hearing.hearingTime}",
-                        type = "HEARING_SCHEDULED",
-                        caseId = hearing.blotterReportId,
-                        isRead = false,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    repository.insertNotification(officerNotification)
-                }
-                Log.d("DashboardViewModel", "✅ Officers notified about hearing")
+            val admins = repository.getUsersByRole("Admin").first()
+            admins.forEach { admin ->
+                val adminNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = admin.id,
+                    title = "Hearing Scheduled",
+                    message = "Hearing scheduled for case $caseNumber on ${hearing.hearingDate} at ${hearing.hearingTime}",
+                    type = "HEARING_SCHEDULED",
+                    caseId = hearing.blotterReportId,
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(adminNotification)
             }
+            Log.d("DashboardViewModel", "✅ Admins notified about hearing")
         } catch (e: Exception) {
-            Log.e("DashboardViewModel", "❌ Failed to notify officers about hearing: ${e.message}", e)
+            Log.e("DashboardViewModel", "❌ Failed to notify admins about hearing: ${e.message}", e)
         }
     }
     
