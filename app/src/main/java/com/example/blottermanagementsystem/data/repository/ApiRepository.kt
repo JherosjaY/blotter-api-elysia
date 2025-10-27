@@ -734,13 +734,14 @@ class ApiRepository {
                     )
                 }
                 Log.d(TAG, "✅ Synced ${notifications.size} notifications from cloud")
-                Result.success(notifications)
+                return@withContext Result.success(notifications)
             } else {
-                Result.failure(Exception("Failed to sync notifications"))
+                Log.e(TAG, "❌ Failed to sync notifications: ${response.code()}")
+                return@withContext Result.failure(Exception("Failed to sync notifications"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error syncing notifications: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
@@ -751,13 +752,13 @@ class ApiRepository {
             
             if (response.isSuccessful && response.body()?.success == true) {
                 Log.d(TAG, "✅ Notification marked as read in cloud")
-                Result.success("Marked as read")
+                return@withContext Result.success("Marked as read")
             } else {
-                Result.failure(Exception("Failed to mark as read"))
+                return@withContext Result.failure(Exception("Failed to mark as read"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error marking notification as read: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
@@ -768,13 +769,13 @@ class ApiRepository {
             
             if (response.isSuccessful && response.body()?.success == true) {
                 Log.d(TAG, "✅ Notification deleted from cloud")
-                Result.success("Deleted")
+                return@withContext Result.success("Deleted")
             } else {
-                Result.failure(Exception("Failed to delete"))
+                return@withContext Result.failure(Exception("Failed to delete"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error deleting notification: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
