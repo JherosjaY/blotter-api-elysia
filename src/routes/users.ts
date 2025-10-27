@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { users } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { users, fcmTokens } from "../db/schema";
+import { eq, and } from "drizzle-orm";
 
 export const usersRoutes = new Elysia({ prefix: "/users" })
   // Get all users
@@ -95,30 +95,54 @@ export const usersRoutes = new Elysia({ prefix: "/users" })
     };
   })
 
-  // Save FCM token
+  // Save FCM token (Multi-device support)
   .post(
     "/fcm-token",
     async ({ body, set }) => {
       try {
         const { userId, fcmToken, deviceId } = body;
 
-        // Update user's FCM token in database
-        const [updatedUser] = await db
+        // Check if this device already has a token
+        const existingToken = await db.query.fcmTokens.findFirst({
+          where: and(
+            eq(fcmTokens.userId, userId),
+            eq(fcmTokens.deviceId, deviceId || "")
+          ),
+        });
+
+        if (existingToken) {
+          // Update existing token
+          await db
+            .update(fcmTokens)
+            .set({
+              fcmToken,
+              lastUsed: new Date(),
+              updatedAt: new Date(),
+              isActive: true,
+            })
+            .where(eq(fcmTokens.id, existingToken.id));
+        } else {
+          // Insert new token for this device
+          await db.insert(fcmTokens).values({
+            userId,
+            fcmToken,
+            deviceId,
+            isActive: true,
+            lastUsed: new Date(),
+          });
+        }
+
+        // Also update the main users table (for backward compatibility)
+        await db
           .update(users)
           .set({
             fcmToken,
             deviceId,
             updatedAt: new Date(),
           })
-          .where(eq(users.id, userId))
-          .returning();
+          .where(eq(users.id, userId));
 
-        if (!updatedUser) {
-          set.status = 404;
-          return { success: false, message: "User not found" };
-        }
-
-        console.log(`✅ FCM token saved for user ${userId}`);
+        console.log(`✅ FCM token saved for user ${userId} on device ${deviceId || "unknown"}`);
 
         return {
           success: true,

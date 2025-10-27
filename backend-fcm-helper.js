@@ -102,20 +102,35 @@ async function sendToToken(fcmToken, notification) {
  */
 export async function sendNotificationToUser(db, userId, notification) {
   try {
-    // Get user's FCM token from database
-    const user = await db.users.findOne({ id: userId });
+    // Get all active FCM tokens for this user (multi-device support)
+    const tokens = await db.query.fcmTokens.findMany({
+      where: (fcmTokens, { eq, and }) => and(
+        eq(fcmTokens.userId, userId),
+        eq(fcmTokens.isActive, true)
+      )
+    });
     
-    if (!user) {
-      console.log(`⚠️ User ${userId} not found`);
-      return { success: false, error: 'User not found' };
+    if (!tokens || tokens.length === 0) {
+      console.log(`⚠️ No active FCM tokens for user ${userId}`);
+      return { success: false, error: 'No FCM tokens' };
     }
     
-    if (!user.fcmToken) {
-      console.log(`⚠️ No FCM token for user ${userId}`);
-      return { success: false, error: 'No FCM token' };
-    }
+    console.log(`📤 Sending notification to ${tokens.length} device(s) for user ${userId}`);
     
-    return await sendToToken(user.fcmToken, notification);
+    // Send to all devices
+    const results = await Promise.all(
+      tokens.map(tokenRecord => sendToToken(tokenRecord.fcmToken, notification))
+    );
+    
+    // Return success if at least one device received the notification
+    const successCount = results.filter(r => r.success).length;
+    console.log(`✅ Notification sent to ${successCount}/${tokens.length} device(s)`);
+    
+    return { 
+      success: successCount > 0, 
+      devicesReached: successCount,
+      totalDevices: tokens.length
+    };
   } catch (error) {
     console.error('❌ Error sending notification to user:', error);
     return { success: false, error: error.message };

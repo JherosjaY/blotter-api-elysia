@@ -276,3 +276,16 @@ export const summons = pgTable("summons", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// FCM Tokens Table (Multi-device support)
+export const fcmTokens = pgTable("fcm_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  fcmToken: text("fcm_token").notNull(),
+  deviceId: varchar("device_id", { length: 255 }),
+  deviceName: varchar("device_name", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  lastUsed: timestamp("last_used").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
