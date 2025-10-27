@@ -29,8 +29,12 @@ fun UserReportDetailScreen(
     onNavigateToCaseTimeline: (Int, String) -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val allReports by viewModel.allReports.collectAsState(initial = emptyList())
-    val report = allReports.find { it.id == reportId }
+    // Fetch the specific report by ID
+    var report by remember { mutableStateOf<com.example.blottermanagementsystem.data.entity.BlotterReport?>(null) }
+    
+    LaunchedEffect(reportId) {
+        report = viewModel.getReportByIdDirect(reportId)
+    }
     
     // Check if user owns this report
     val isOwner = report?.userId == userId

@@ -933,6 +933,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             ?: emptyList()
     }
     
+    suspend fun getReportByIdDirect(reportId: Int): BlotterReport? {
+        return repository.getReportById(reportId)
+    }
+    
     suspend fun updateReportStatus(
         reportId: Int,
         newStatus: String,
