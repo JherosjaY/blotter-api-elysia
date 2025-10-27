@@ -842,6 +842,30 @@ class ApiRepository {
         }
     }
     
+    suspend fun getReportByIdFromCloud(reportId: Int): Result<BlotterReport> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "📋 Fetching report $reportId from cloud API...")
+            val response = apiService.getReportById(reportId)
+            
+            if (response.isSuccessful && response.body()?.success == true) {
+                val report = response.body()?.data
+                if (report != null) {
+                    Log.d(TAG, "✅ Fetched report from cloud: ${report.caseNumber}")
+                    return@withContext Result.success(report)
+                } else {
+                    Log.e(TAG, "❌ Report data is null")
+                    return@withContext Result.failure(Exception("Report not found"))
+                }
+            } else {
+                Log.e(TAG, "❌ Failed to fetch report: ${response.body()?.message}")
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error fetching report from cloud: ${e.message}", e)
+            return@withContext Result.failure(e)
+        }
+    }
+    
     // ==================== Health Check ====================
     
     suspend fun healthCheck(): Result<Boolean> = withContext(Dispatchers.IO) {

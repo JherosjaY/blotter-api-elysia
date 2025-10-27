@@ -953,7 +953,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     suspend fun getReportByIdDirect(reportId: Int): BlotterReport? {
-        return repository.getReportById(reportId)
+        // Try local database first
+        var report = repository.getReportById(reportId)
+        
+        // If not found locally, try fetching from cloud
+        if (report == null) {
+            Log.d("DashboardViewModel", "📋 Report $reportId not found locally, fetching from cloud...")
+            try {
+                val result = apiRepository.getReportByIdFromCloud(reportId)
+                if (result.isSuccess) {
+                    report = result.getOrNull()
+                    // Save to local database for future use
+                    report?.let { repository.insertReport(it) }
+                    Log.d("DashboardViewModel", "✅ Report fetched from cloud and saved locally")
+                } else {
+                    Log.e("DashboardViewModel", "❌ Failed to fetch report from cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error fetching report from cloud: ${e.message}", e)
+            }
+        }
+        
+        return report
     }
     
     suspend fun updateReportStatus(
