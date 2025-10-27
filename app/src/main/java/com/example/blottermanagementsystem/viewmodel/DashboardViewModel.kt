@@ -188,9 +188,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun loadDashboardStats() {
         viewModelScope.launch {
             try {
-                Log.d("DashboardViewModel", "📊 Loading dashboard stats from cloud API...")
+                // TEMPORARY: Load from local first, then sync from cloud
+                Log.d("DashboardViewModel", "📱 Loading dashboard stats from local database first...")
+                loadDashboardStatsFromLocal()
                 
-                // Fetch stats from cloud API
+                // Then try to sync from cloud in background
+                Log.d("DashboardViewModel", "📊 Syncing dashboard stats from cloud API...")
                 val result = apiRepository.getDashboardAnalytics()
                 
                 if (result.isSuccess) {
@@ -205,17 +208,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             totalOfficers = data.totalOfficers,
                             totalUsers = data.totalUsers
                         )
-                        Log.d("DashboardViewModel", "✅ Dashboard stats loaded: Users=${data.totalUsers}, Reports=${data.totalReports}")
+                        Log.d("DashboardViewModel", "✅ Dashboard stats synced from cloud: Users=${data.totalUsers}, Reports=${data.totalReports}")
                     }
                 } else {
-                    Log.e("DashboardViewModel", "❌ Failed to load stats from API, falling back to local")
-                    // Fallback to local database if API fails
-                    loadDashboardStatsFromLocal()
+                    Log.e("DashboardViewModel", "❌ Failed to sync stats from cloud, using local data")
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "❌ Error loading stats: ${e.message}", e)
-                // Fallback to local database
-                loadDashboardStatsFromLocal()
+                Log.e("DashboardViewModel", "❌ Error syncing stats from cloud: ${e.message}, using local data", e)
             }
         }
     }
