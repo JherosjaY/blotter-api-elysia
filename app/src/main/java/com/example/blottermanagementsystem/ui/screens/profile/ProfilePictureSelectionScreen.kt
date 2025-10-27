@@ -51,17 +51,29 @@ fun ProfilePictureSelectionScreen(
     val scope = rememberCoroutineScope()
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var selectedEmoji by remember { mutableStateOf("👤") }
+    var isLoadingImage by remember { mutableStateOf(false) }
     
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            selectedImageUri = it
-            // Grant persistent permission
-            context.contentResolver.takePersistableUriPermission(
-                it,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+            isLoadingImage = true
+            scope.launch {
+                try {
+                    // Simulate image processing/loading
+                    kotlinx.coroutines.delay(500)
+                    selectedImageUri = it
+                    // Grant persistent permission
+                    context.contentResolver.takePersistableUriPermission(
+                        it,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    isLoadingImage = false
+                }
+            }
         }
     }
     
@@ -155,22 +167,53 @@ fun ProfilePictureSelectionScreen(
                         .clip(CircleShape)
                         .background(Color.White)
                         .border(4.dp, ElectricBlue, CircleShape)
-                        .clickable { imagePickerLauncher.launch("image/*") },
+                        .clickable { 
+                            if (!isLoadingImage) {
+                                imagePickerLauncher.launch("image/*")
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-            if (selectedImageUri != null) {
-                Image(
-                    painter = rememberAsyncImagePainter(selectedImageUri),
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                } else {
-                    Text(
-                        text = selectedEmoji,
-                        fontSize = 72.sp
-                    )
-                }
+                    if (selectedImageUri != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(selectedImageUri),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = selectedEmoji,
+                            fontSize = 72.sp
+                        )
+                    }
+                    
+                    // Loading overlay
+                    if (isLoadingImage) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = ElectricBlue,
+                                    modifier = Modifier.size(40.dp),
+                                    strokeWidth = 3.dp
+                                )
+                                Text(
+                                    text = "Loading...",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
             }
         
@@ -178,7 +221,12 @@ fun ProfilePictureSelectionScreen(
         
         // Upload from Gallery Button
         OutlinedButton(
-            onClick = { imagePickerLauncher.launch("image/*") },
+            onClick = { 
+                if (!isLoadingImage) {
+                    imagePickerLauncher.launch("image/*")
+                }
+            },
+            enabled = !isLoadingImage,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = ElectricBlue

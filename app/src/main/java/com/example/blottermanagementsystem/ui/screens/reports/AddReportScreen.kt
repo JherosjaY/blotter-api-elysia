@@ -1400,12 +1400,12 @@ fun AddReportScreen(
                                 
                                 // Step 6: Upload Audio to Firebase Storage (if exists)
                                 var cloudAudioUrl = ""
-                                if (audioFilePath != null) {
+                                audioFilePath?.let { audioPath ->
                                     try {
                                         // Generate temporary report ID for filename
                                         val tempReportId = System.currentTimeMillis().toInt()
                                         val uploadedUrl = AudioUploadHelper.uploadAudioToCloud(
-                                            audioFilePath = audioFilePath,
+                                            audioFilePath = audioPath,
                                             reportId = tempReportId
                                         )
                                         if (uploadedUrl != null) {
@@ -1413,11 +1413,11 @@ fun AddReportScreen(
                                             Toast.makeText(context, "✅ Audio uploaded to cloud", Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, "⚠️ Audio upload failed, saved locally", Toast.LENGTH_SHORT).show()
-                                            cloudAudioUrl = audioFilePath // Fallback to local path
+                                            cloudAudioUrl = audioPath // Fallback to local path
                                         }
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "⚠️ Audio upload error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        cloudAudioUrl = audioFilePath // Fallback to local path
+                                        cloudAudioUrl = audioPath // Fallback to local path
                                     }
                                 }
                                 

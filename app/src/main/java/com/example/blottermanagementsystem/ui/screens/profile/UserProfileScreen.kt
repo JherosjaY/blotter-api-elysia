@@ -655,72 +655,284 @@ fun UserProfileScreen(
         
         AlertDialog(
             onDismissRequest = { 
-                showChangePasswordDialog = false
-                currentPassword = ""
-                newPassword = ""
-                confirmNewPassword = ""
-                errorMessage = null
+                if (!isLoading) {
+                    showChangePasswordDialog = false
+                    currentPassword = ""
+                    newPassword = ""
+                    confirmNewPassword = ""
+                    errorMessage = null
+                    successMessage = null
+                }
             },
             title = {
-                Text(
-                    text = "Change Password",
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Change Password",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Secured with BCrypt • Cloud Synced",
+                            fontSize = 11.sp,
+                            color = TextSecondary
+                        )
+                    }
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Current Password Field
                     OutlinedTextField(
                         value = currentPassword,
                         onValueChange = { 
                             currentPassword = it
                             errorMessage = null
+                            successMessage = null
                         },
-                        label = { Text("Current Password") },
-                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("Current pass") },
+                        placeholder = { Text("Current password") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = ElectricBlue
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showCurrentPassword = !showCurrentPassword }) {
+                                Icon(
+                                    imageVector = if (showCurrentPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (showCurrentPassword) "Hide password" else "Show password",
+                                    tint = TextSecondary
+                                )
+                            }
+                        },
+                        visualTransformation = if (showCurrentPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         singleLine = true,
+                        enabled = !isLoading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ElectricBlue,
-                            unfocusedBorderColor = TextSecondary
-                        )
+                            unfocusedBorderColor = TextSecondary,
+                            focusedLabelColor = ElectricBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
+                    // New Password Field
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { 
                             newPassword = it
                             errorMessage = null
+                            successMessage = null
                         },
-                        label = { Text("New Password") },
-                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("New pass") },
+                        placeholder = { Text("New password") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.VpnKey,
+                                contentDescription = null,
+                                tint = SuccessGreen
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showNewPassword = !showNewPassword }) {
+                                Icon(
+                                    imageVector = if (showNewPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (showNewPassword) "Hide password" else "Show password",
+                                    tint = TextSecondary
+                                )
+                            }
+                        },
+                        visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         singleLine = true,
+                        enabled = !isLoading,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricBlue,
-                            unfocusedBorderColor = TextSecondary
-                        )
+                            focusedBorderColor = SuccessGreen,
+                            unfocusedBorderColor = TextSecondary,
+                            focusedLabelColor = SuccessGreen
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
+                    // Password Strength Indicator
+                    if (newPassword.isNotEmpty()) {
+                        val strength = when {
+                            newPassword.length < 6 -> "Weak"
+                            newPassword.length < 8 -> "Medium"
+                            newPassword.length >= 8 && newPassword.any { it.isDigit() } && newPassword.any { it.isUpperCase() } -> "Strong"
+                            else -> "Medium"
+                        }
+                        val strengthColor = when (strength) {
+                            "Weak" -> ErrorRed
+                            "Medium" -> WarningOrange
+                            "Strong" -> SuccessGreen
+                            else -> TextSecondary
+                        }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = when (strength) {
+                                    "Weak" -> Icons.Default.Warning
+                                    "Medium" -> Icons.Default.Info
+                                    "Strong" -> Icons.Default.CheckCircle
+                                    else -> Icons.Default.Info
+                                },
+                                contentDescription = null,
+                                tint = strengthColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Password Strength: $strength",
+                                fontSize = 12.sp,
+                                color = strengthColor,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    
+                    // Confirm Password Field
                     OutlinedTextField(
                         value = confirmNewPassword,
                         onValueChange = { 
                             confirmNewPassword = it
                             errorMessage = null
+                            successMessage = null
                         },
-                        label = { Text("Confirm New Password") },
-                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("Confirm pass") },
+                        placeholder = { Text("Re-enter pass") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = if (confirmNewPassword.isNotEmpty() && newPassword == confirmNewPassword) SuccessGreen else TextSecondary
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                                Icon(
+                                    imageVector = if (showConfirmPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (showConfirmPassword) "Hide password" else "Show password",
+                                    tint = TextSecondary
+                                )
+                            }
+                        },
+                        visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         singleLine = true,
+                        enabled = !isLoading,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricBlue,
-                            unfocusedBorderColor = TextSecondary
-                        )
+                            focusedBorderColor = if (confirmNewPassword.isNotEmpty() && newPassword == confirmNewPassword) SuccessGreen else ElectricBlue,
+                            unfocusedBorderColor = TextSecondary,
+                            focusedLabelColor = if (confirmNewPassword.isNotEmpty() && newPassword == confirmNewPassword) SuccessGreen else ElectricBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
+                    // Error Message
                     errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = ErrorRed,
-                            fontSize = 12.sp
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = ErrorRed.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = ErrorRed,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = it,
+                                    color = ErrorRed,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Success Message
+                    successMessage?.let {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = it,
+                                    color = SuccessGreen,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Info Card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = InfoBlue.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = InfoBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Password will be encrypted with BCrypt and synced to cloud",
+                                    color = InfoBlue,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp
+                                )
+                                Text(
+                                    text = "• Multi-device sync enabled\n• Old password will be invalid on all devices",
+                                    color = InfoBlue.copy(alpha = 0.8f),
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp
+                                )
+                            }
+                        }
                     }
                 }
             },
@@ -737,34 +949,72 @@ fun UserProfileScreen(
                             newPassword.length < 6 -> {
                                 errorMessage = "Password must be at least 6 characters"
                             }
+                            currentPassword == newPassword -> {
+                                errorMessage = "New password must be different from current password"
+                            }
                             else -> {
+                                isLoading = true
+                                errorMessage = null
                                 scope.launch {
-                                    val success = authViewModel.changePassword(
-                                        userId = userId,
-                                        currentPassword = currentPassword,
-                                        newPassword = newPassword
-                                    )
-                                    if (success) {
-                                        showChangePasswordDialog = false
-                                    } else {
-                                        errorMessage = "Current password is incorrect"
+                                    try {
+                                        val success = authViewModel.changePassword(
+                                            userId = userId,
+                                            currentPassword = currentPassword,
+                                            newPassword = newPassword
+                                        )
+                                        if (success) {
+                                            successMessage = "✅ Password changed successfully! Synced to cloud."
+                                            kotlinx.coroutines.delay(2000)
+                                            showChangePasswordDialog = false
+                                        } else {
+                                            errorMessage = "Current password is incorrect"
+                                        }
+                                    } catch (e: Exception) {
+                                        errorMessage = "Failed to change password: ${e.message}"
+                                    } finally {
+                                        isLoading = false
                                     }
                                 }
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                    modifier = Modifier.height(48.dp)
                 ) {
-                    Text("Change Password")
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Updating...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Change Password")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showChangePasswordDialog = false }) {
-                    Text("Cancel", color = ElectricBlue)
+                TextButton(
+                    onClick = { 
+                        if (!isLoading) {
+                            showChangePasswordDialog = false
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
+                    Text("Cancel", color = if (isLoading) TextSecondary else ElectricBlue)
                 }
             },
             containerColor = CardBackground,
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(20.dp)
         )
     }
     

@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         
                         // Check for app updates
                         LaunchedEffect(Unit) {
-                            val apiRepository = ApiRepository(context)
+                            val apiRepository = ApiRepository()
                             val updateInfo = VersionChecker.checkForUpdate(context, apiRepository)
                             if (updateInfo != null) {
                                 versionInfo = updateInfo

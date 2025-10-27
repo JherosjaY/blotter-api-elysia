@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.blottermanagementsystem.ui.theme.*
 import com.example.blottermanagementsystem.utils.PreferencesManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,12 +31,18 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
     
     var notificationsEnabled by remember { mutableStateOf(preferencesManager.notificationsEnabled) }
     var soundEnabled by remember { mutableStateOf(preferencesManager.notificationSoundEnabled) }
     
     var showVersionDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    
+    // Version info from backend
+    var latestVersion by remember { mutableStateOf("1.0.0") }
+    var versionDescription by remember { mutableStateOf("A comprehensive system for managing barangay blotter reports, case tracking, and legal documentation.") }
+    var isLoadingVersion by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -168,9 +175,30 @@ fun SettingsScreen(
                     Column {
                         SettingItem(
                             title = "Version",
-                            description = "1.0.0",
+                            description = latestVersion,
                             icon = Icons.Default.Info,
-                            onClick = { showVersionDialog = true }
+                            onClick = { 
+                                showVersionDialog = true
+                                // Fetch latest version from backend
+                                isLoadingVersion = true
+                                scope.launch {
+                                    try {
+                                        val apiRepository = com.example.blottermanagementsystem.data.repository.ApiRepository()
+                                        val result = apiRepository.getAppVersion()
+                                        if (result.isSuccess) {
+                                            val versionData = result.getOrNull()
+                                            if (versionData != null) {
+                                                latestVersion = versionData.latestVersionName
+                                                versionDescription = versionData.updateMessage
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Use default values
+                                    } finally {
+                                        isLoadingVersion = false
+                                    }
+                                }
+                            }
                         )
                         Divider(color = DividerColor, modifier = Modifier.padding(vertical = 8.dp))
                         SettingItem(
@@ -210,31 +238,117 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
-                    Text(
-                        text = "Version 1.0.0",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ElectricBlue
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Barangay Blotter Management System",
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "© 2025 All Rights Reserved",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "A comprehensive system for managing barangay blotter reports, case tracking, and legal documentation.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
-                    )
+                if (isLoadingVersion) {
+                    // Loading state
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = ElectricBlue,
+                                modifier = Modifier.size(40.dp)
+                            )
+                            Text(
+                                text = "Fetching latest version info...",
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                } else {
+                    // Version info
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDone,
+                                contentDescription = null,
+                                tint = SuccessGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Version $latestVersion",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ElectricBlue
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Barangay Blotter Management System",
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "© 2025 All Rights Reserved",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Features/Description from backend
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = InfoBlue.copy(alpha = 0.1f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NewReleases,
+                                        contentDescription = null,
+                                        tint = InfoBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Features:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = InfoBlue
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = versionDescription,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Cloud sync badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cloud,
+                                contentDescription = null,
+                                tint = ElectricBlue,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Cloud-synced • Multi-device compatible",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
