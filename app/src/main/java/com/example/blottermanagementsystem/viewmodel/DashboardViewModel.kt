@@ -642,6 +642,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // Save to local Room database
         repository.insertHearing(hearing)
         
+        // Sync to cloud API
+        viewModelScope.launch {
+            try {
+                Log.d("DashboardViewModel", "📤 Syncing hearing to cloud...")
+                val result = apiRepository.createHearing(hearing)
+                if (result.isSuccess) {
+                    Log.d("DashboardViewModel", "✅ Hearing synced to cloud!")
+                } else {
+                    Log.e("DashboardViewModel", "❌ Failed to sync hearing to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error syncing hearing: ${e.message}", e)
+            }
+        }
+        
         // Log activity
         logActivity(
             activityType = "Hearing Scheduled",
@@ -650,6 +665,49 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             caseId = hearing.blotterReportId,
             caseTitle = caseNumber
         )
+        
+        // Notify the user who filed the case
+        try {
+            val report = repository.getReportById(hearing.blotterReportId)
+            if (report != null) {
+                val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = report.userId,
+                    title = "Hearing Scheduled",
+                    message = "A hearing for your case $caseNumber has been scheduled on ${hearing.hearingDate} at ${hearing.hearingTime}",
+                    type = "HEARING_SCHEDULED",
+                    caseId = hearing.blotterReportId,
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(userNotification)
+                Log.d("DashboardViewModel", "✅ User notified about hearing")
+            }
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Failed to notify user about hearing: ${e.message}", e)
+        }
+        
+        // Notify assigned officers
+        try {
+            val report = repository.getReportById(hearing.blotterReportId)
+            if (report != null && report.assignedOfficerIds.isNotEmpty()) {
+                val officerIds = report.assignedOfficerIds.split(",").mapNotNull { it.trim().toIntOrNull() }
+                officerIds.forEach { officerId ->
+                    val officerNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                        userId = officerId,
+                        title = "Hearing Scheduled",
+                        message = "Hearing scheduled for case $caseNumber on ${hearing.hearingDate} at ${hearing.hearingTime}",
+                        type = "HEARING_SCHEDULED",
+                        caseId = hearing.blotterReportId,
+                        isRead = false,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repository.insertNotification(officerNotification)
+                }
+                Log.d("DashboardViewModel", "✅ Officers notified about hearing")
+            }
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Failed to notify officers about hearing: ${e.message}", e)
+        }
     }
     
     fun getHearingsByReportId(reportId: Int) = repository.getHearingsByReportId(reportId)
@@ -682,6 +740,49 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             caseId = resolution.blotterReportId,
             caseTitle = caseNumber
         )
+        
+        // Notify the user who filed the case
+        try {
+            val report = repository.getReportById(resolution.blotterReportId)
+            if (report != null) {
+                val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = report.userId,
+                    title = "Case Resolved",
+                    message = "Your case $caseNumber has been resolved: ${resolution.resolutionType}",
+                    type = "CASE_RESOLVED",
+                    caseId = resolution.blotterReportId,
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(userNotification)
+                Log.d("DashboardViewModel", "✅ User notified about resolution")
+            }
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Failed to notify user about resolution: ${e.message}", e)
+        }
+        
+        // Notify assigned officers
+        try {
+            val report = repository.getReportById(resolution.blotterReportId)
+            if (report != null && report.assignedOfficerIds.isNotEmpty()) {
+                val officerIds = report.assignedOfficerIds.split(",").mapNotNull { it.trim().toIntOrNull() }
+                officerIds.forEach { officerId ->
+                    val officerNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                        userId = officerId,
+                        title = "Case Resolved",
+                        message = "Case $caseNumber has been resolved: ${resolution.resolutionType}",
+                        type = "CASE_RESOLVED",
+                        caseId = resolution.blotterReportId,
+                        isRead = false,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repository.insertNotification(officerNotification)
+                }
+                Log.d("DashboardViewModel", "✅ Officers notified about resolution")
+            }
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Failed to notify officers about resolution: ${e.message}", e)
+        }
     }
     
     fun getResolutionByReportId(reportId: Int) = repository.getResolutionByReportId(reportId)
