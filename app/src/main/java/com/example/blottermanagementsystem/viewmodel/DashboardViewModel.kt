@@ -746,7 +746,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             assignedOfficer = officerName,
             status = "Assigned"
         )
+        
+        // Update local database
         repository.updateReport(updatedReport)
+        
+        // Sync to cloud API
+        viewModelScope.launch {
+            try {
+                Log.d("DashboardViewModel", "📤 Syncing officer assignment to cloud...")
+                val result = apiRepository.updateReport(updatedReport.id, updatedReport)
+                if (result.isSuccess) {
+                    Log.d("DashboardViewModel", "✅ Officer assignment synced to cloud!")
+                } else {
+                    Log.e("DashboardViewModel", "❌ Failed to sync officer assignment to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error syncing officer assignment: ${e.message}", e)
+            }
+        }
         
         // Log activity
         logActivity(
