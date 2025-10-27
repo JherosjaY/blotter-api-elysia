@@ -701,7 +701,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val officerIdsString = officerIds.joinToString(",")
                     val updatedReport = report.copy(
                         assignedOfficerIds = officerIdsString,
-                        status = if (report.status == "Pending") "Assigned" else report.status
+                        status = if (report.status == "Pending") "Under Investigation" else report.status
                     )
                     
                     // Update local database
@@ -732,23 +732,41 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     // Notify each officer
                     officerIds.forEach { officerId ->
                         try {
-                            val notification = com.example.blottermanagementsystem.data.entity.Notification(
+                            val officerNotification = com.example.blottermanagementsystem.data.entity.Notification(
                                 userId = officerId,
                                 title = "New Case Assigned",
-                                message = "You have been assigned to case ${report.caseNumber}",
+                                message = "You have been assigned to case ${report.caseNumber} - ${report.incidentType}",
                                 type = "CASE_ASSIGNED",
                                 caseId = report.id,
                                 isRead = false,
                                 timestamp = System.currentTimeMillis()
                             )
-                            repository.insertNotification(notification)
+                            repository.insertNotification(officerNotification)
+                            Log.d("DashboardViewModel", "✅ Officer $officerId notified")
                         } catch (e: Exception) {
-                            Log.e("DashboardViewModel", "Failed to notify officer $officerId: ${e.message}")
+                            Log.e("DashboardViewModel", "❌ Failed to notify officer $officerId: ${e.message}")
                         }
+                    }
+                    
+                    // Notify the user who filed the case
+                    try {
+                        val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                            userId = report.userId,
+                            title = "Officers Assigned to Your Case",
+                            message = "Your case ${report.caseNumber} is now under investigation",
+                            type = "OFFICER_ASSIGNED",
+                            caseId = report.id,
+                            isRead = false,
+                            timestamp = System.currentTimeMillis()
+                        )
+                        repository.insertNotification(userNotification)
+                        Log.d("DashboardViewModel", "✅ User notified about officer assignment")
+                    } catch (e: Exception) {
+                        Log.e("DashboardViewModel", "❌ Failed to notify user: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Failed to assign officers: ${e.message}")
+                Log.e("DashboardViewModel", "❌ Failed to assign officers: ${e.message}")
             }
         }
     }
@@ -794,18 +812,36 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         
         // Notify the officer
         try {
-            val notification = com.example.blottermanagementsystem.data.entity.Notification(
+            val officerNotification = com.example.blottermanagementsystem.data.entity.Notification(
                 userId = officerUserId,
                 title = "New Case Assigned",
-                message = "You have been assigned to case ${report.caseNumber}",
+                message = "You have been assigned to case ${report.caseNumber} - ${report.incidentType}",
                 type = "CASE_ASSIGNED",
                 caseId = report.id,
                 isRead = false,
                 timestamp = System.currentTimeMillis()
             )
-            repository.insertNotification(notification)
+            repository.insertNotification(officerNotification)
+            Log.d("DashboardViewModel", "✅ Officer notification created")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("DashboardViewModel", "❌ Failed to create officer notification: ${e.message}", e)
+        }
+        
+        // Notify the user who filed the case
+        try {
+            val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                userId = report.userId,
+                title = "Officer Assigned to Your Case",
+                message = "Officer $officerName has been assigned to your case ${report.caseNumber}",
+                type = "OFFICER_ASSIGNED",
+                caseId = report.id,
+                isRead = false,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.insertNotification(userNotification)
+            Log.d("DashboardViewModel", "✅ User notification created")
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Failed to create user notification: ${e.message}", e)
         }
         
         refreshStats()
@@ -1009,6 +1045,43 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 caseId = reportId,
                 caseTitle = it.caseNumber
             )
+            
+            // Notify the user who filed the case
+            try {
+                val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = it.userId,
+                    title = "Case Status Updated",
+                    message = "Your case ${it.caseNumber} status changed to $newStatus",
+                    type = "STATUS_UPDATE",
+                    caseId = reportId,
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(userNotification)
+                Log.d("DashboardViewModel", "✅ User notification created for status update")
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Failed to create user notification: ${e.message}", e)
+            }
+            
+            // Notify all admins about status change
+            try {
+                val admins = repository.getUsersByRole("Admin").first()
+                admins.forEach { admin ->
+                    val adminNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                        userId = admin.id,
+                        title = "Case Status Updated",
+                        message = "Case ${it.caseNumber} status changed to $newStatus",
+                        type = "STATUS_UPDATE",
+                        caseId = reportId,
+                        isRead = false,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repository.insertNotification(adminNotification)
+                }
+                Log.d("DashboardViewModel", "✅ Admin notifications created for status update")
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Failed to create admin notifications: ${e.message}", e)
+            }
             
             refreshStats()
         }
