@@ -811,14 +811,14 @@ class ApiRepository {
                     )
                 }
                 Log.d(TAG, "✅ Fetched ${reports.size} reports from cloud")
-                Result.success(reports)
+                return@withContext Result.success(reports)
             } else {
                 Log.e(TAG, "❌ Failed to fetch reports: ${response.body()?.message}")
-                Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error fetching reports from cloud: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
@@ -827,10 +827,10 @@ class ApiRepository {
     suspend fun healthCheck(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.healthCheck()
-            Result.success(response.isSuccessful)
+            return@withContext Result.success(response.isSuccessful)
         } catch (e: Exception) {
             Log.e(TAG, "Health check error: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
@@ -862,14 +862,14 @@ class ApiRepository {
                 val failureCount = data?.get("failureCount") as? Double ?: 0.0
                 
                 Log.d(TAG, "✅ FCM notifications sent: Success=${successCount.toInt()}, Failed=${failureCount.toInt()}")
-                Result.success(true)
+                return@withContext Result.success(true)
             } else {
                 Log.e(TAG, "❌ Failed to send FCM notifications: ${response.body()?.message}")
-                Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ FCM notification error: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
     
@@ -884,16 +884,16 @@ class ApiRepository {
                 val versionData = response.body()?.data
                 if (versionData != null) {
                     Log.d(TAG, "✅ Version info received: ${versionData.latestVersionName}")
-                    Result.success(versionData)
+                    return@withContext Result.success(versionData)
                 } else {
-                    Result.failure(Exception("No version data"))
+                    return@withContext Result.failure(Exception("No version data"))
                 }
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to get version"))
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Failed to get version"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Version check error: ${e.message}", e)
-            Result.failure(e)
+            return@withContext Result.failure(e)
         }
     }
 }
