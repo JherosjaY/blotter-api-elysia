@@ -26,17 +26,38 @@ let isInitialized = false;
 export function initializeFCM() {
   if (!isInitialized) {
     try {
-      const serviceAccount = require('./firebase-service-account.json');
-      
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-      
-      console.log('✅ Firebase Admin SDK initialized');
-      isInitialized = true;
+      // Try to use environment variables first (for production)
+      if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          })
+        });
+        console.log('✅ Firebase Admin SDK initialized (from environment variables)');
+        isInitialized = true;
+      } else {
+        // Try JSON file (for local development)
+        try {
+          const serviceAccount = require('./firebase-service-account.json');
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+          });
+          console.log('✅ Firebase Admin SDK initialized (from JSON file)');
+          isInitialized = true;
+        } catch (fileError) {
+          console.warn('⚠️ Firebase Admin SDK not initialized - FCM notifications will be disabled');
+          console.warn('⚠️ To enable FCM, set FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, and FIREBASE_CLIENT_EMAIL environment variables');
+          // Don't throw error - allow app to run without FCM
+          isInitialized = false;
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to initialize Firebase Admin SDK:', error);
-      throw error;
+      console.warn('⚠️ FCM notifications will be disabled');
+      // Don't throw error - allow app to run without FCM
+      isInitialized = false;
     }
   }
 }
