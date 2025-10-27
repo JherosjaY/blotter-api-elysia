@@ -41,6 +41,7 @@ fun AdminDashboardScreen(
     onNavigateToRecordsArchive: () -> Unit,
     onNavigateToQRScanner: () -> Unit,
     onNavigateToNotificationSender: () -> Unit,
+    onNavigateToReportOversight: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onLogout: () -> Unit = {},
@@ -257,8 +258,14 @@ fun AdminDashboardScreen(
                         highlighted = true
                     )
                     
-                    // Placeholder for future feature
-                    Spacer(modifier = Modifier.weight(1f))
+                    ActionCard(
+                        title = "Report Oversight",
+                        subtitle = "Assign officers to cases",
+                        icon = Icons.Default.Assignment,
+                        onClick = onNavigateToReportOversight,
+                        modifier = Modifier.weight(1f),
+                        highlighted = true
+                    )
                 }
             }
             

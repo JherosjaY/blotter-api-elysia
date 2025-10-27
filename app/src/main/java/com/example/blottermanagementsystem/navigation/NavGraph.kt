@@ -260,6 +260,9 @@ fun NavGraph(
                 onNavigateToNotificationSender = {
                     navController.navigate(Screen.AdminNotificationSender.route)
                 },
+                onNavigateToReportOversight = {
+                    navController.navigate(Screen.AdminReportOversight.route)
+                },
                 onNavigateToNotifications = {
                     navController.navigate(Screen.Notifications.route)
                 },
