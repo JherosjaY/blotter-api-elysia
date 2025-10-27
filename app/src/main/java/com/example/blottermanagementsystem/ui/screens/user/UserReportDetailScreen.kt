@@ -71,16 +71,7 @@ fun UserReportDetailScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (report == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Report not found")
-            }
-        } else {
+        report?.let { currentReport ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -131,19 +122,19 @@ fun UserReportDetailScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                report.caseNumber,
+                                currentReport.caseNumber,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ElectricBlue
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Complainant: ${report.complainantName}", fontSize = 14.sp)
-                            Text("Type: ${report.incidentType}", fontSize = 14.sp)
+                            Text("Complainant: ${currentReport.complainantName}", fontSize = 14.sp)
+                            Text("Type: ${currentReport.incidentType}", fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             // Status Badge
                             Surface(
-                                color = when (report.status) {
+                                color = when (currentReport.status) {
                                     "Resolved" -> SuccessGreen.copy(alpha = 0.2f)
                                     "Pending" -> WarningOrange.copy(alpha = 0.2f)
                                     else -> InfoBlue.copy(alpha = 0.2f)
@@ -151,11 +142,11 @@ fun UserReportDetailScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    "Status: ${report.status}",
+                                    "Status: ${currentReport.status}",
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = when (report.status) {
+                                    color = when (currentReport.status) {
                                         "Resolved" -> SuccessGreen
                                         "Pending" -> WarningOrange
                                         else -> InfoBlue
@@ -184,18 +175,18 @@ fun UserReportDetailScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                report.narrative,
+                                currentReport.narrative,
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Location: ${report.incidentLocation}",
+                                "Location: ${currentReport.incidentLocation}",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                "Date: ${report.incidentDate}",
+                                "Date: ${currentReport.incidentDate}",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -206,7 +197,7 @@ fun UserReportDetailScreen(
                 // Timeline
                 item {
                     OutlinedButton(
-                        onClick = { onNavigateToCaseTimeline(reportId, report.caseNumber) },
+                        onClick = { onNavigateToCaseTimeline(reportId, currentReport.caseNumber) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Timeline, contentDescription = null)
@@ -216,7 +207,7 @@ fun UserReportDetailScreen(
                 }
                 
                 // Edit Button (if owner and pending)
-                if (isOwner && report.status == "Pending") {
+                if (isOwner && currentReport.status == "Pending") {
                     item {
                         Button(
                             onClick = { onNavigateToEdit(reportId) },
@@ -285,6 +276,13 @@ fun UserReportDetailScreen(
                     }
                 }
             }
+        } ?: Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Report not found")
         }
         
         // Delete Confirmation Dialog
