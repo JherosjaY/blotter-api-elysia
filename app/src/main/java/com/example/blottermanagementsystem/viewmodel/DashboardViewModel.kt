@@ -327,6 +327,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             caseTitle = report.caseNumber
         )
         
+        // Notify the user who filed the report
+        viewModelScope.launch {
+            try {
+                val userNotification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = creatorUserId,
+                    title = "Report Filed Successfully",
+                    message = "Your case ${report.caseNumber} has been filed and is under review",
+                    type = "CASE_FILED",
+                    caseId = reportId.toInt(),
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(userNotification)
+                Log.d("DashboardViewModel", "✅ User notification created for case ${report.caseNumber}")
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Failed to create user notification: ${e.message}", e)
+            }
+        }
+        
         // Notify all admins about new report
         viewModelScope.launch {
             try {
