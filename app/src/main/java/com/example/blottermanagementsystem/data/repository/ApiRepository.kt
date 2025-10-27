@@ -419,6 +419,30 @@ class ApiRepository {
         }
     }
     
+    // ==================== Hearings ====================
+    
+    suspend fun createHearing(hearing: com.example.blottermanagementsystem.data.entity.Hearing): Result<com.example.blottermanagementsystem.data.entity.Hearing> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "📅 Creating hearing in cloud...")
+            val response = apiService.createHearing(hearing)
+            
+            if (response.isSuccessful && response.body()?.success == true) {
+                val data = response.body()?.data
+                if (data != null) {
+                    Log.d(TAG, "✅ Hearing created in cloud: ${data.id}")
+                    return@withContext Result.success(data)
+                } else {
+                    return@withContext Result.failure(Exception("No data"))
+                }
+            } else {
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Hearing creation error: ${e.message}", e)
+            return@withContext Result.failure(e)
+        }
+    }
+    
     // ==================== Resolutions ====================
     
     suspend fun createResolution(resolution: com.example.blottermanagementsystem.data.entity.Resolution): Result<com.example.blottermanagementsystem.data.entity.Resolution> = withContext(Dispatchers.IO) {

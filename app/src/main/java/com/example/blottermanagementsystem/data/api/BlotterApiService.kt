@@ -143,6 +143,14 @@ interface BlotterApiService {
     @DELETE("api/suspects/{id}")
     suspend fun deleteSuspect(@Path("id") id: Int): Response<ApiResponse<String>>
     
+    // ==================== Hearings ====================
+    
+    @GET("api/hearings/report/{reportId}")
+    suspend fun getHearingsByReportId(@Path("reportId") reportId: Int): Response<ApiResponse<List<com.example.blottermanagementsystem.data.entity.Hearing>>>
+    
+    @POST("api/hearings")
+    suspend fun createHearing(@Body hearing: com.example.blottermanagementsystem.data.entity.Hearing): Response<ApiResponse<com.example.blottermanagementsystem.data.entity.Hearing>>
+    
     // ==================== Resolutions ====================
     
     @GET("api/resolutions/report/{reportId}")
