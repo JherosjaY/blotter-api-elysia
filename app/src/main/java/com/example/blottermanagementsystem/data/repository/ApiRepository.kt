@@ -866,6 +866,49 @@ class ApiRepository {
         }
     }
     
+    // ==================== Person History ====================
+    
+    suspend fun getPersonHistoryFromCloud(personId: Int): Result<List<com.example.blottermanagementsystem.data.entity.PersonHistory>> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "📋 Fetching person history for person $personId from cloud...")
+            val response = apiService.getPersonHistory(personId)
+            
+            if (response.isSuccessful && response.body()?.success == true) {
+                val history = response.body()?.data ?: emptyList()
+                Log.d(TAG, "✅ Fetched ${history.size} history records from cloud")
+                return@withContext Result.success(history)
+            } else {
+                Log.e(TAG, "❌ Failed to fetch person history: ${response.body()?.message}")
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error fetching person history from cloud: ${e.message}", e)
+            return@withContext Result.failure(e)
+        }
+    }
+    
+    suspend fun createPersonHistory(history: com.example.blottermanagementsystem.data.entity.PersonHistory): Result<com.example.blottermanagementsystem.data.entity.PersonHistory> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "📤 Creating person history in cloud...")
+            val response = apiService.createPersonHistory(history)
+            
+            if (response.isSuccessful && response.body()?.success == true) {
+                val data = response.body()?.data
+                if (data != null) {
+                    Log.d(TAG, "✅ Person history created in cloud: ${data.id}")
+                    return@withContext Result.success(data)
+                } else {
+                    return@withContext Result.failure(Exception("No data"))
+                }
+            } else {
+                return@withContext Result.failure(Exception(response.body()?.message ?: "Unknown error"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Person history creation error: ${e.message}", e)
+            return@withContext Result.failure(e)
+        }
+    }
+    
     // ==================== Health Check ====================
     
     suspend fun healthCheck(): Result<Boolean> = withContext(Dispatchers.IO) {

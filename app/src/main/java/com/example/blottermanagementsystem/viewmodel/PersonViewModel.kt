@@ -7,6 +7,7 @@ import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.Person
 import com.example.blottermanagementsystem.data.entity.PersonHistory
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import com.example.blottermanagementsystem.data.repository.ApiRepository
 import android.util.Log
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 class PersonViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = BlotterDatabase.getDatabase(application)
+    private val apiRepository = ApiRepository()
     private val repository = BlotterRepository(
         userDao = database.userDao(),
         blotterReportDao = database.blotterReportDao(),
@@ -124,10 +126,48 @@ class PersonViewModel(application: Application) : AndroidViewModel(application) 
             description = description,
             performedByPersonId = performedByPersonId
         )
+        
+        // Save to local database
         repository.insertHistory(history)
+        
+        // Sync to cloud
+        viewModelScope.launch {
+            try {
+                Log.d("PersonViewModel", "📤 Syncing person history to cloud...")
+                val result = apiRepository.createPersonHistory(history)
+                if (result.isSuccess) {
+                    Log.d("PersonViewModel", "✅ Person history synced to cloud!")
+                } else {
+                    Log.e("PersonViewModel", "❌ Failed to sync person history to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("PersonViewModel", "❌ Error syncing person history: ${e.message}", e)
+            }
+        }
     }
     
     fun getPersonHistory(personId: Int): Flow<List<PersonHistory>> {
+        // Sync from cloud first
+        viewModelScope.launch {
+            try {
+                Log.d("PersonViewModel", "🔄 Syncing person history from cloud...")
+                val result = apiRepository.getPersonHistoryFromCloud(personId)
+                if (result.isSuccess) {
+                    val cloudHistory = result.getOrNull() ?: emptyList()
+                    // Save to local database
+                    cloudHistory.forEach { history ->
+                        repository.insertHistory(history)
+                    }
+                    Log.d("PersonViewModel", "✅ Synced ${cloudHistory.size} history records from cloud")
+                } else {
+                    Log.e("PersonViewModel", "❌ Failed to sync person history from cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("PersonViewModel", "❌ Error syncing person history: ${e.message}", e)
+            }
+        }
+        
+        // Return local database flow
         return repository.getHistoryByPersonId(personId)
     }
     

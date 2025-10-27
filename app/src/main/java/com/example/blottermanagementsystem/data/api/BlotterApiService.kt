@@ -178,6 +178,14 @@ interface BlotterApiService {
     @GET("api/dashboard/analytics")
     suspend fun getDashboardAnalytics(): Response<ApiResponse<DashboardAnalyticsData>>
     
+    // ==================== Person History ====================
+    
+    @GET("api/persons/{personId}/history")
+    suspend fun getPersonHistory(@Path("personId") personId: Int): Response<ApiResponse<List<com.example.blottermanagementsystem.data.entity.PersonHistory>>>
+    
+    @POST("api/persons/history")
+    suspend fun createPersonHistory(@Body history: com.example.blottermanagementsystem.data.entity.PersonHistory): Response<ApiResponse<com.example.blottermanagementsystem.data.entity.PersonHistory>>
+    
     // ==================== Health Check ====================
     
     @GET("health")
