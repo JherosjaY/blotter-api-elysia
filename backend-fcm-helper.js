@@ -102,6 +102,19 @@ async function sendToToken(fcmToken, notification) {
  */
 export async function sendNotificationToUser(db, userId, notification) {
   try {
+    // Create notification record in database (for in-app notifications)
+    const { notifications } = await import('./src/db/schema.js');
+    await db.insert(notifications).values({
+      userId: userId,
+      title: notification.title,
+      message: notification.body,
+      type: notification.data?.type || 'general',
+      caseId: notification.data?.case_id || null,
+      isRead: false,
+      timestamp: new Date()
+    });
+    console.log(`💾 Notification saved to database for user ${userId}`);
+    
     // Get all active FCM tokens for this user (multi-device support)
     const tokens = await db.query.fcmTokens.findMany({
       where: (fcmTokens, { eq, and }) => and(
@@ -111,11 +124,11 @@ export async function sendNotificationToUser(db, userId, notification) {
     });
     
     if (!tokens || tokens.length === 0) {
-      console.log(`⚠️ No active FCM tokens for user ${userId}`);
-      return { success: false, error: 'No FCM tokens' };
+      console.log(`⚠️ No active FCM tokens for user ${userId}, but notification saved to database`);
+      return { success: true, error: 'No FCM tokens but saved to DB' };
     }
     
-    console.log(`📤 Sending notification to ${tokens.length} device(s) for user ${userId}`);
+    console.log(`📤 Sending push notification to ${tokens.length} device(s) for user ${userId}`);
     
     // Send to all devices
     const results = await Promise.all(
@@ -124,7 +137,7 @@ export async function sendNotificationToUser(db, userId, notification) {
     
     // Return success if at least one device received the notification
     const successCount = results.filter(r => r.success).length;
-    console.log(`✅ Notification sent to ${successCount}/${tokens.length} device(s)`);
+    console.log(`✅ Push notification sent to ${successCount}/${tokens.length} device(s)`);
     
     return { 
       success: successCount > 0, 
