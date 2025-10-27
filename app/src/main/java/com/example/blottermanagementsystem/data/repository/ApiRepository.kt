@@ -187,7 +187,27 @@ class ApiRepository {
     suspend fun createReport(report: BlotterReport): Result<BlotterReport> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "🌐 API Create Report - Calling: ${report.caseNumber}")
-            val response = apiService.createReport(report)
+            
+            // Map BlotterReport to API format
+            val apiReport = mapOf(
+                "caseNumber" to report.caseNumber,
+                "incidentType" to report.incidentType,
+                "incidentDate" to java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(report.incidentDate)),
+                "incidentTime" to report.incidentTime,
+                "incidentLocation" to report.incidentLocation,
+                "narrative" to report.narrative,
+                "complainantName" to report.complainantName,
+                "complainantContact" to report.complainantContact,
+                "complainantAddress" to report.complainantAddress,
+                "status" to report.status,
+                "filedById" to report.userId, // Map userId to filedById
+                "assignedOfficerIds" to report.assignedOfficerIds,
+                "isArchived" to report.isArchived,
+                "audioRecordingUri" to report.audioUri
+            )
+            
+            Log.d(TAG, "📤 Sending report data: $apiReport")
+            val response = apiService.createReportRaw(apiReport)
             
             if (response.isSuccessful && response.body()?.success == true) {
                 val createdReport = response.body()?.data

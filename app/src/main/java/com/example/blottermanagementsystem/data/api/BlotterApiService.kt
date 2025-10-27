@@ -83,6 +83,9 @@ interface BlotterApiService {
     @POST("api/reports")
     suspend fun createReport(@Body report: BlotterReport): Response<ApiResponse<BlotterReport>>
     
+    @POST("api/reports")
+    suspend fun createReportRaw(@Body report: Map<String, Any?>): Response<ApiResponse<BlotterReport>>
+    
     @PUT("api/reports/{id}")
     suspend fun updateReport(
         @Path("id") id: Int,
