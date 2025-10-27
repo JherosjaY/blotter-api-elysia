@@ -59,19 +59,31 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" })
       
       const archivedReports = archivedResult[0]?.count || 0;
 
-      // Count officers
+      // Count officers (from users table with Officer role)
       const officersResult = await db
         .select({ count: count() })
-        .from(officers)
-        .where(eq(officers.isActive, true));
+        .from(users)
+        .where(
+          and(
+            eq(users.isActive, true),
+            eq(users.role, "Officer")
+          )
+        );
       
       const totalOfficers = officersResult[0]?.count || 0;
 
-      // Count users
+      // Count users (exclude Admin and Officer roles)
       const usersResult = await db
         .select({ count: count() })
         .from(users)
-        .where(eq(users.isActive, true));
+        .where(
+          and(
+            eq(users.isActive, true),
+            // Exclude Admin and Officer from user count
+            // Only count regular users
+            eq(users.role, "User")
+          )
+        );
       
       const totalUsers = usersResult[0]?.count || 0;
 

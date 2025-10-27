@@ -36,8 +36,8 @@ fun AdminReportDetailScreen(
     val allReports by viewModel.allReports.collectAsState(initial = emptyList())
     val report = allReports.find { it.id == reportId }
     
-    // Get all officers
-    val allUsers by viewModel.allUsers.collectAsState(initial = emptyList())
+    // Get all officers from cloud-synced StateFlow
+    val allUsers by viewModel.allUsers.collectAsState() // Now uses StateFlow from cloud
     val allOfficers = allUsers.filter { it.role == "Officer" }
     
     var showAssignOfficerDialog by remember { mutableStateOf(false) }

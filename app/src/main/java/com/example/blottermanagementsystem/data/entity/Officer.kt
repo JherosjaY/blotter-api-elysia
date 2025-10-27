@@ -11,9 +11,11 @@ data class Officer(
     val name: String,
     val rank: String,
     val badgeNumber: String,
-    val contactNumber: String = "",
+    val contactNumber: String? = null,
+    val email: String? = null,
     val gender: String? = null,
     val assignedCases: Int = 0, // Number of assigned cases
     val isAvailable: Boolean = true,
+    val isActive: Boolean = true,
     val dateAdded: Long = System.currentTimeMillis()
 )

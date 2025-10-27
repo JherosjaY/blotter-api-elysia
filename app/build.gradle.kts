@@ -2,12 +2,12 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.blottermanagementsystem"
     compileSdk = 36
-
     defaultConfig {
         applicationId = "com.example.blottermanagementsystem"
         minSdk = 26  // Increased from 24 to support Apache POI for Excel export
@@ -178,6 +178,15 @@ dependencies {
     
     // Speech Recognition (Voice-to-Text)
     // Already included in Android SDK
+    
+    // Firebase Cloud Messaging (FCM) & Storage
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-storage-ktx") // ✅ Audio upload to cloud
+    
+    // Cloudinary for image upload
+    implementation("com.cloudinary:cloudinary-android:2.5.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

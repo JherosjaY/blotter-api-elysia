@@ -281,9 +281,31 @@ fun ProfilePictureSelectionScreen(
         Button(
             onClick = {
                 scope.launch {
-                    // Save selected profile picture
+                    val userId = preferencesManager.userId
+                    
+                    // Save selected profile picture to database AND preferences
+                    val profilePhotoUri = if (selectedImageUri != null) {
+                        // Upload image to Cloudinary
+                        val uploadResult = com.example.blottermanagementsystem.utils.CloudinaryUploader.uploadImage(
+                            context, selectedImageUri!!, userId
+                        )
+                        
+                        if (uploadResult.isSuccess) {
+                            uploadResult.getOrNull() ?: selectedImageUri.toString()
+                        } else {
+                            // Fallback: copy to internal storage if upload fails
+                            val copiedPath = com.example.blottermanagementsystem.utils.ImageUtils.copyImageToInternalStorage(
+                                context, selectedImageUri!!, userId
+                            )
+                            copiedPath ?: selectedImageUri.toString()
+                        }
+                    } else {
+                        "emoji:$selectedEmoji" // Save emoji with prefix
+                    }
+                    
+                    // Save to preferences (for immediate use)
                     if (selectedImageUri != null) {
-                        preferencesManager.profileImageUri = selectedImageUri.toString()
+                        preferencesManager.profileImageUri = profilePhotoUri
                     } else {
                         preferencesManager.profileEmoji = selectedEmoji
                     }
@@ -291,10 +313,9 @@ fun ProfilePictureSelectionScreen(
                     // Mark as selected
                     preferencesManager.hasSelectedProfilePicture = true
                     
-                    // Update user's profileCompleted flag in database
-                    val userId = preferencesManager.userId
+                    // Update user's profile in database (will sync to cloud)
                     if (userId != -1) {
-                        authViewModel.markProfileCompleted(userId)
+                        authViewModel.updateUserProfile(userId, profilePhotoUri)
                     }
                     
                     onComplete()

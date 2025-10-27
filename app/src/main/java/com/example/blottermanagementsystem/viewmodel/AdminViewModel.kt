@@ -11,10 +11,12 @@ import com.example.blottermanagementsystem.data.entity.BlotterReport
 import com.example.blottermanagementsystem.data.entity.Notification
 import com.example.blottermanagementsystem.data.entity.ActivityLog
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val database = BlotterDatabase.getDatabase(application)
@@ -85,6 +87,56 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         repository.insertOfficer(officer)
     }
     
+    suspend fun createAdminAccount(
+        firstName: String,
+        lastName: String,
+        username: String,
+        password: String
+    ): Int {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AdminViewModel", "👨‍💼 Creating admin account in cloud...")
+                
+                // Create admin via API (cloud) with Admin role
+                val apiRepository = com.example.blottermanagementsystem.data.repository.ApiRepository()
+                val result = apiRepository.register(
+                    username = username,
+                    password = password,
+                    firstName = firstName,
+                    lastName = lastName,
+                    role = "Admin"
+                )
+                
+                if (result.isSuccess) {
+                    val user = result.getOrNull()
+                    if (user != null) {
+                        Log.d("AdminViewModel", "✅ Admin account created in cloud: ${user.id}")
+                        
+                        // Mark profile as completed for admin
+                        val updatedUser = user.copy(
+                            profileCompleted = true,
+                            mustChangePassword = false
+                        )
+                        
+                        // Save to local database for offline access
+                        val hashedPassword = com.example.blottermanagementsystem.utils.SecurityUtils.hashPassword(password)
+                        val localUser = updatedUser.copy(password = hashedPassword)
+                        repository.insertUser(localUser)
+                        
+                        Log.d("AdminViewModel", "✅ Admin account synced to local database")
+                        return@withContext user.id
+                    }
+                }
+                
+                Log.e("AdminViewModel", "❌ Failed to create admin in cloud")
+                throw Exception("Failed to create admin account")
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "❌ Error creating admin: ${e.message}", e)
+                throw e
+            }
+        }
+    }
+    
     suspend fun createOfficerAccount(
         firstName: String,
         lastName: String,
@@ -92,23 +144,49 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         tempPassword: String,
         badgeNumber: String
     ): Int {
-        // Hash the temporary password
-        val hashedPassword = com.example.blottermanagementsystem.utils.SecurityUtils.hashPassword(tempPassword)
-        
-        val newUser = com.example.blottermanagementsystem.data.entity.User(
-            firstName = firstName,
-            lastName = lastName,
-            username = username,
-            password = hashedPassword,
-            role = "Officer",
-            profileCompleted = false, // Force profile setup on first login
-            mustChangePassword = true, // Force password change on first login
-            badgeNumber = badgeNumber,
-            isActive = true
-        )
-        
-        val userId = repository.insertUser(newUser).toInt()
-        return userId
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AdminViewModel", "👮 Creating officer account in cloud...")
+                
+                // Create officer via API (cloud) with Officer role
+                val apiRepository = com.example.blottermanagementsystem.data.repository.ApiRepository()
+                val result = apiRepository.register(
+                    username = username,
+                    password = tempPassword,
+                    firstName = firstName,
+                    lastName = lastName,
+                    role = "Officer"
+                )
+                
+                if (result.isSuccess) {
+                    val user = result.getOrNull()
+                    if (user != null) {
+                        Log.d("AdminViewModel", "✅ Officer account created in cloud: ${user.id}")
+                        
+                        // Update user with badge number and password flags
+                        val updatedUser = user.copy(
+                            badgeNumber = badgeNumber,
+                            profileCompleted = false,
+                            mustChangePassword = true
+                        )
+                        
+                        // Save to local database for offline access
+                        val hashedPassword = com.example.blottermanagementsystem.utils.SecurityUtils.hashPassword(tempPassword)
+                        val localUser = updatedUser.copy(password = hashedPassword)
+                        repository.insertUser(localUser)
+                        
+                        Log.d("AdminViewModel", "✅ Officer account synced to local database")
+                        return@withContext user.id
+                    }
+                }
+                
+                Log.e("AdminViewModel", "❌ Failed to create officer in cloud")
+                throw Exception("Failed to create officer account")
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "❌ Error creating officer: ${e.message}", e)
+                throw e
+            }
+        }
     }
     
     suspend fun updateOfficer(officer: Officer) {

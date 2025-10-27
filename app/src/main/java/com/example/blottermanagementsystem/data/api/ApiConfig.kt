@@ -11,13 +11,13 @@ import java.util.concurrent.TimeUnit
  */
 object ApiConfig {
     
-    // Localhost API Base URL (for development)
+    // Cloud API Base URL (for production - LIVE!)
+    private const val BASE_URL = "https://blotter-backend.onrender.com/"
+    
+    // Localhost API Base URL (for development - currently disabled)
     // Use 10.0.2.2 for Android Emulator (maps to host machine's localhost)
     // Use your computer's IP (e.g., 192.168.1.XXX) for physical device
-    private const val BASE_URL = "http://10.0.2.2:3000/"
-    
-    // Cloud API Base URL (for production - currently disabled)
-    // private const val BASE_URL = "https://blotter-api-elysia.onrender.com/"
+    // private const val BASE_URL = "http://10.0.2.2:3000/"
     
     // Logging Interceptor for debugging
     private val loggingInterceptor = HttpLoggingInterceptor().apply {

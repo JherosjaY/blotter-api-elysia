@@ -93,4 +93,51 @@ export const usersRoutes = new Elysia({ prefix: "/users" })
       success: true,
       message: "User deleted successfully",
     };
-  });
+  })
+
+  // Save FCM token
+  .post(
+    "/fcm-token",
+    async ({ body, set }) => {
+      try {
+        const { userId, fcmToken, deviceId } = body;
+
+        // Update user's FCM token in database
+        const [updatedUser] = await db
+          .update(users)
+          .set({
+            fcmToken,
+            deviceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+          .returning();
+
+        if (!updatedUser) {
+          set.status = 404;
+          return { success: false, message: "User not found" };
+        }
+
+        console.log(`✅ FCM token saved for user ${userId}`);
+
+        return {
+          success: true,
+          message: "FCM token saved successfully",
+        };
+      } catch (error) {
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to save FCM token",
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+    {
+      body: t.Object({
+        userId: t.Number(),
+        fcmToken: t.String(),
+        deviceId: t.Optional(t.String()),
+      }),
+    }
+  );

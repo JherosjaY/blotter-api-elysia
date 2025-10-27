@@ -40,6 +40,7 @@ fun AdminDashboardScreen(
     onNavigateToOfficers: () -> Unit,
     onNavigateToRecordsArchive: () -> Unit,
     onNavigateToQRScanner: () -> Unit,
+    onNavigateToNotificationSender: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onLogout: () -> Unit = {},
@@ -238,6 +239,26 @@ fun AdminDashboardScreen(
                         onClick = onNavigateToQRScanner,
                         modifier = Modifier.weight(1f)
                     )
+                }
+            }
+            
+            // Action Cards Row 3
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ActionCard(
+                        title = "Send Notification",
+                        subtitle = "Push announcements",
+                        icon = Icons.Default.Notifications,
+                        onClick = onNavigateToNotificationSender,
+                        modifier = Modifier.weight(1f),
+                        highlighted = true
+                    )
+                    
+                    // Placeholder for future feature
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
             

@@ -51,13 +51,19 @@ import com.example.blottermanagementsystem.data.entity.BlotterReport
 import com.example.blottermanagementsystem.data.entity.Person
 import com.example.blottermanagementsystem.data.entity.PersonActivityType
 import com.example.blottermanagementsystem.ui.theme.*
+import com.example.blottermanagementsystem.utils.AudioRecorder
+import com.example.blottermanagementsystem.utils.AudioUploadHelper
+import com.example.blottermanagementsystem.utils.EmailHelper
+import com.example.blottermanagementsystem.utils.MediaUploadHelper
 import com.example.blottermanagementsystem.utils.PreferencesManager
+import com.example.blottermanagementsystem.utils.PushNotificationHelper
 import com.example.blottermanagementsystem.viewmodel.DashboardViewModel
 import com.example.blottermanagementsystem.viewmodel.PersonViewModel
 import com.example.blottermanagementsystem.viewmodel.RespondentViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import android.Manifest
 
 @Composable
 fun getVideoThumbnail(context: android.content.Context, uri: Uri): android.graphics.Bitmap? {
@@ -89,6 +95,34 @@ fun AddReportScreen(
     val scope = rememberCoroutineScope()
     val preferencesManager = remember { PreferencesManager(context) }
     val currentUserId = preferencesManager.userId
+    
+    // Audio Recording
+    val audioRecorder = remember { AudioRecorder(context) }
+    var audioFilePath by remember { mutableStateOf<String?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
+    var isPlayingAudio by remember { mutableStateOf(false) }
+    
+    // Audio permission launcher
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val path = audioRecorder.startRecording()
+            if (path != null) {
+                isRecording = true
+                Toast.makeText(context, "Recording started", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "Audio permission required", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // Clean up audio recorder
+    DisposableEffect(Unit) {
+        onDispose {
+            audioRecorder.release()
+        }
+    }
     
     var caseNumber by remember { mutableStateOf("BLT-${System.currentTimeMillis()}") }
     
@@ -1091,16 +1125,146 @@ fun AddReportScreen(
                     Spacer(modifier = Modifier.width(2.dp))
                     Text("Videos", fontSize = 11.sp, maxLines = 1)
                 }
+                
+                // Audio Recording Button
+                OutlinedButton(
+                    onClick = { 
+                        errorMessage = null
+                        if (isRecording) {
+                            // Stop recording
+                            val path = audioRecorder.stopRecording()
+                            if (path != null) {
+                                audioFilePath = path
+                                isRecording = false
+                                Toast.makeText(context, "Recording saved", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            // Request permission and start recording
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (isRecording) ErrorRed else ElectricBlue
+                    ),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(
+                            if (isRecording) ErrorRed else ElectricBlue
+                        )
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = if (isRecording) "Stop" else "Record",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        if (isRecording) "Stop" else "Audio",
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                }
             }
             
             // Total count indicator
-            if (imageUris.isNotEmpty() || videoUris.isNotEmpty()) {
+            if (imageUris.isNotEmpty() || videoUris.isNotEmpty() || audioFilePath != null) {
                 Text(
-                    text = "Photos: ${imageUris.size}/5  •  Videos: ${videoUris.size}/5",
+                    text = "Photos: ${imageUris.size}/5  •  Videos: ${videoUris.size}/5${if (audioFilePath != null) "  •  Audio: 1" else ""}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            }
+            
+            // Audio Recording Display
+            if (audioFilePath != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = SuccessGreen.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = "Audio",
+                                tint = SuccessGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Audio Recording",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    audioRecorder.formatFileSize(
+                                        audioRecorder.getFileSize(audioFilePath!!)
+                                    ),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        
+                        Row {
+                            // Play button
+                            IconButton(
+                                onClick = {
+                                    if (isPlayingAudio) {
+                                        audioRecorder.stopPlaying()
+                                        isPlayingAudio = false
+                                    } else {
+                                        audioRecorder.playAudio(audioFilePath!!) {
+                                            isPlayingAudio = false
+                                        }
+                                        isPlayingAudio = true
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    if (isPlayingAudio) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlayingAudio) "Stop" else "Play",
+                                    tint = ElectricBlue
+                                )
+                            }
+                            
+                            // Delete button
+                            IconButton(
+                                onClick = {
+                                    audioFilePath?.let { path ->
+                                        audioRecorder.deleteAudio(path)
+                                        audioFilePath = null
+                                        isPlayingAudio = false
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = ErrorRed
+                                )
+                            }
+                        }
+                    }
+                }
             }
             } // End of if (hasEvidenceNow)
             
@@ -1187,14 +1351,77 @@ fun AddReportScreen(
                                     ).toInt()
                                 }
                                 
-                                // Step 3: Convert evidence URIs to JSON strings
-                                val imageUrisJson = imageUris.joinToString(",") { it.toString() }
-                                val videoUrisJson = videoUris.joinToString(",") { it.toString() }
+                                // Step 3: Upload Photos to Firebase Storage (if any)
+                                var cloudPhotoUrls = listOf<String>()
+                                if (imageUris.isNotEmpty()) {
+                                    try {
+                                        Toast.makeText(context, "📸 Uploading ${imageUris.size} photo(s)...", Toast.LENGTH_SHORT).show()
+                                        val tempReportId = System.currentTimeMillis().toInt()
+                                        cloudPhotoUrls = MediaUploadHelper.uploadMultiplePhotos(
+                                            context = context,
+                                            photoUris = imageUris,
+                                            reportId = tempReportId
+                                        ) { current, total ->
+                                            // Progress callback
+                                        }
+                                        Toast.makeText(context, "✅ ${cloudPhotoUrls.size} photo(s) uploaded!", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "⚠️ Photo upload error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        cloudPhotoUrls = imageUris.map { it.toString() } // Fallback to local
+                                    }
+                                }
+                                
+                                // Step 4: Upload Videos to Firebase Storage (if any)
+                                var cloudVideoUrls = listOf<String>()
+                                if (videoUris.isNotEmpty()) {
+                                    try {
+                                        Toast.makeText(context, "🎥 Uploading ${videoUris.size} video(s)...", Toast.LENGTH_SHORT).show()
+                                        val tempReportId = System.currentTimeMillis().toInt()
+                                        cloudVideoUrls = MediaUploadHelper.uploadMultipleVideos(
+                                            context = context,
+                                            videoUris = videoUris,
+                                            reportId = tempReportId
+                                        ) { current, total ->
+                                            // Progress callback
+                                        }
+                                        Toast.makeText(context, "✅ ${cloudVideoUrls.size} video(s) uploaded!", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "⚠️ Video upload error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        cloudVideoUrls = videoUris.map { it.toString() } // Fallback to local
+                                    }
+                                }
+                                
+                                // Step 5: Convert evidence URIs to JSON strings (now with cloud URLs)
+                                val imageUrisJson = cloudPhotoUrls.joinToString(",")
+                                val videoUrisJson = cloudVideoUrls.joinToString(",")
                                 val videoDurationsJson = videoDurations.entries.joinToString(",") { 
                                     "${it.key}:${it.value}" 
                                 }
                                 
-                                // Step 4: Create Blotter Report
+                                // Step 6: Upload Audio to Firebase Storage (if exists)
+                                var cloudAudioUrl = ""
+                                if (audioFilePath != null) {
+                                    try {
+                                        // Generate temporary report ID for filename
+                                        val tempReportId = System.currentTimeMillis().toInt()
+                                        val uploadedUrl = AudioUploadHelper.uploadAudioToCloud(
+                                            audioFilePath = audioFilePath,
+                                            reportId = tempReportId
+                                        )
+                                        if (uploadedUrl != null) {
+                                            cloudAudioUrl = uploadedUrl
+                                            Toast.makeText(context, "✅ Audio uploaded to cloud", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "⚠️ Audio upload failed, saved locally", Toast.LENGTH_SHORT).show()
+                                            cloudAudioUrl = audioFilePath // Fallback to local path
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "⚠️ Audio upload error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        cloudAudioUrl = audioFilePath // Fallback to local path
+                                    }
+                                }
+                                
+                                // Step 5: Create Blotter Report
                                 val report = BlotterReport(
                                     caseNumber = caseNumber,
                                     complainantName = complainantName,
@@ -1213,7 +1440,8 @@ fun AddReportScreen(
                                     userId = currentUserId,
                                     imageUris = imageUrisJson,
                                     videoUris = videoUrisJson,
-                                    videoDurations = videoDurationsJson
+                                    videoDurations = videoDurationsJson,
+                                    audioUri = cloudAudioUrl // ✅ Cloud URL or local path!
                                 )
                                 
                                 val currentUserName = "${preferencesManager.firstName} ${preferencesManager.lastName}"
@@ -1246,6 +1474,25 @@ fun AddReportScreen(
                                             // SMS failed, but continue
                                         }
                                     }
+                                }
+                                
+                                // Step 8: Send Push Notification
+                                try {
+                                    PushNotificationHelper.sendReportFiledNotification(
+                                        context = context,
+                                        report = report
+                                    )
+                                } catch (e: Exception) {
+                                    // Notification failed, but continue
+                                }
+                                
+                                // Step 9: Send Email Notification (if email is available)
+                                try {
+                                    // You can add email field to the form if needed
+                                    // For now, we'll skip email or use a default
+                                    // EmailHelper.sendReportFiledEmail(context, report, email)
+                                } catch (e: Exception) {
+                                    // Email failed, but continue
                                 }
                                 
                                 isLoading = false

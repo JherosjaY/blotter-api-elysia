@@ -62,13 +62,29 @@ fun UserProfileScreen(
     val username = preferencesManager.username ?: ""
     val role = preferencesManager.userRole ?: "User"
     val userId = preferencesManager.userId
-    var profileImageUri by remember { mutableStateOf(preferencesManager.profileImageUri) }
-    val profileEmoji = preferencesManager.profileEmoji ?: "👤"
+    var profileImageUri by remember { mutableStateOf<String?>(null) }
+    var profileEmoji by remember { mutableStateOf("👤") }
     
-    // Watch for profile image changes
-    LaunchedEffect(Unit) {
-        // Refresh profile image from preferences
-        profileImageUri = preferencesManager.profileImageUri
+    // Load profile photo from database (not just preferences!)
+    LaunchedEffect(userId) {
+        scope.launch {
+            val user = authViewModel.getUserById(userId)
+            if (user != null && !user.profilePhotoUri.isNullOrEmpty()) {
+                val photoUri = user.profilePhotoUri!!
+                if (photoUri.startsWith("emoji:")) {
+                    // It's an emoji
+                    profileEmoji = photoUri.removePrefix("emoji:")
+                    profileImageUri = null
+                } else {
+                    // It's an image URI
+                    profileImageUri = photoUri
+                }
+            } else {
+                // Fallback to preferences
+                profileImageUri = preferencesManager.profileImageUri
+                profileEmoji = preferencesManager.profileEmoji ?: "👤"
+            }
+        }
     }
     
     // Image picker launcher
@@ -152,8 +168,23 @@ fun UserProfileScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (profileImageUri != null) {
+                                    // Load image from URL, file path, or URI
+                                    val imageUri = when {
+                                        profileImageUri!!.startsWith("http://") || profileImageUri!!.startsWith("https://") -> {
+                                            // It's a cloud URL (Cloudinary)
+                                            profileImageUri
+                                        }
+                                        profileImageUri!!.startsWith("/") -> {
+                                            // It's a file path
+                                            Uri.fromFile(java.io.File(profileImageUri!!))
+                                        }
+                                        else -> {
+                                            // It's a content URI
+                                            Uri.parse(profileImageUri)
+                                        }
+                                    }
                                     Image(
-                                        painter = rememberAsyncImagePainter(Uri.parse(profileImageUri)),
+                                        painter = rememberAsyncImagePainter(imageUri),
                                         contentDescription = "Profile Picture",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -434,8 +465,15 @@ fun UserProfileScreen(
                     if (profileImageUri != null) {
                         OutlinedButton(
                             onClick = {
-                                preferencesManager.profileImageUri = null
-                                profileImageUri = null
+                                scope.launch {
+                                    // Clear local preferences
+                                    preferencesManager.profileImageUri = null
+                                    profileImageUri = null
+                                    profileEmoji = "👤" // Reset to default emoji
+                                    
+                                    // Sync to cloud - set empty string
+                                    authViewModel.updateUserProfile(userId, "")
+                                }
                                 showPhotoOptionsDialog = false
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -472,8 +510,22 @@ fun UserProfileScreen(
                         .height(400.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    val imageUri = when {
+                        profileImageUri!!.startsWith("http://") || profileImageUri!!.startsWith("https://") -> {
+                            // It's a cloud URL (Cloudinary)
+                            profileImageUri
+                        }
+                        profileImageUri!!.startsWith("/") -> {
+                            // It's a file path
+                            Uri.fromFile(java.io.File(profileImageUri!!))
+                        }
+                        else -> {
+                            // It's a content URI
+                            Uri.parse(profileImageUri)
+                        }
+                    }
                     Image(
-                        painter = rememberAsyncImagePainter(Uri.parse(profileImageUri)),
+                        painter = rememberAsyncImagePainter(imageUri),
                         contentDescription = "Full Profile Picture",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
@@ -589,12 +641,17 @@ fun UserProfileScreen(
         )
     }
     
-    // Change Password Dialog (reuse from original)
+    // Enhanced Change Password Dialog with BCrypt + Cloud Sync
     if (showChangePasswordDialog) {
         var currentPassword by remember { mutableStateOf("") }
         var newPassword by remember { mutableStateOf("") }
         var confirmNewPassword by remember { mutableStateOf("") }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        var successMessage by remember { mutableStateOf<String?>(null) }
+        var isLoading by remember { mutableStateOf(false) }
+        var showCurrentPassword by remember { mutableStateOf(false) }
+        var showNewPassword by remember { mutableStateOf(false) }
+        var showConfirmPassword by remember { mutableStateOf(false) }
         
         AlertDialog(
             onDismissRequest = { 

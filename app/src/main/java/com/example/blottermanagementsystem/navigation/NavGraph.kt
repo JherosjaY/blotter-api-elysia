@@ -49,12 +49,14 @@ import com.example.blottermanagementsystem.ui.screens.dashboard.AdminDashboardSc
 import com.example.blottermanagementsystem.ui.screens.admin.RecordsArchiveScreen // ADMIN ONLY
 import com.example.blottermanagementsystem.ui.screens.dashboard.UserDashboardScreen // USER ONLY
 import com.example.blottermanagementsystem.ui.screens.onboarding.OnboardingScreen
+import com.example.blottermanagementsystem.ui.screens.permissions.PermissionsSetupScreen
 import com.example.blottermanagementsystem.ui.screens.profile.ProfileScreen
 import com.example.blottermanagementsystem.ui.screens.profile.UserProfileScreen
 import com.example.blottermanagementsystem.ui.screens.profile.AdminProfileScreen
 import com.example.blottermanagementsystem.ui.screens.profile.OfficerProfileScreen
 import com.example.blottermanagementsystem.ui.screens.profile.ProfilePictureSelectionScreen // USER/CLERK first login
 import com.example.blottermanagementsystem.ui.screens.notifications.NotificationsScreen
+import com.example.blottermanagementsystem.ui.screens.notifications.AdminNotificationSenderScreen
 import com.example.blottermanagementsystem.ui.screens.settings.SettingsScreen
 import com.example.blottermanagementsystem.ui.screens.settings.BackupRestoreScreen // ADMIN ONLY
 
@@ -117,8 +119,19 @@ fun NavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onFinish = {
-                    navController.navigate(Screen.Login.route) {
+                    navController.navigate(Screen.PermissionsSetup.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
+        // Permissions Setup
+        composable(Screen.PermissionsSetup.route) {
+            PermissionsSetupScreen(
+                onPermissionsGranted = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.PermissionsSetup.route) { inclusive = true }
                     }
                 }
             )
@@ -243,6 +256,9 @@ fun NavGraph(
                 },
                 onNavigateToQRScanner = {
                     navController.navigate(Screen.QRScanner.route)
+                },
+                onNavigateToNotificationSender = {
+                    navController.navigate(Screen.AdminNotificationSender.route)
                 },
                 onNavigateToNotifications = {
                     navController.navigate(Screen.Notifications.route)
@@ -812,6 +828,12 @@ fun NavGraph(
                 onNavigateToBackupRestore = {
                     navController.navigate(Screen.BackupRestore.route)
                 }
+            )
+        }
+        
+        composable(Screen.AdminNotificationSender.route) {
+            AdminNotificationSenderScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         

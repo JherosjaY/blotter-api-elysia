@@ -20,5 +20,7 @@ data class User(
     val rank: String? = null,
     val dutyStatus: String? = null,
     val mustChangePassword: Boolean = false,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val fcmToken: String? = null,
+    val deviceId: String? = null
 )

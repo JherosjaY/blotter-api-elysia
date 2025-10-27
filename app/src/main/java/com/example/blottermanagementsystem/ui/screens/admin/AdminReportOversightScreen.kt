@@ -36,7 +36,7 @@ fun AdminReportOversightScreen(
     viewModel: DashboardViewModel = viewModel()
 ) {
     val allReports by viewModel.allReports.collectAsState(initial = emptyList())
-    val officers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
+    val officers by viewModel.allOfficers.collectAsState() // Now uses StateFlow from cloud
     val scope = rememberCoroutineScope()
     
     var filterStatus by remember { mutableStateOf("All") }

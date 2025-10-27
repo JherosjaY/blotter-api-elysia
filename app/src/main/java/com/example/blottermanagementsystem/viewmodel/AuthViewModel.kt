@@ -8,6 +8,7 @@ import com.example.blottermanagementsystem.data.entity.User
 import com.example.blottermanagementsystem.data.entity.ActivityLog
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
 import com.example.blottermanagementsystem.data.repository.ApiRepository
+import com.example.blottermanagementsystem.utils.FCMHelper
 import com.example.blottermanagementsystem.utils.PreferencesManager
 import com.example.blottermanagementsystem.utils.SecurityUtils
 import android.util.Log
@@ -89,17 +90,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         profilePhoto = apiUser.profilePhotoUri
                     )
                     
-                    // Profile picture logic
+                    // Profile picture logic - check if user already completed profile
                     when (apiUser.role) {
                         "Admin", "Officer" -> {
                             preferencesManager.hasSelectedProfilePicture = true
                         }
                         else -> {
-                            if (!apiUser.profileCompleted) {
-                                preferencesManager.hasSelectedProfilePicture = false
-                            }
+                            // If user already completed profile (has photo or profileCompleted=true), skip selection
+                            val hasProfile = !apiUser.profilePhotoUri.isNullOrEmpty() || apiUser.profileCompleted
+                            preferencesManager.hasSelectedProfilePicture = hasProfile
                         }
                     }
+                    
+                    // Subscribe to FCM topics based on role
+                    FCMHelper.subscribeToTopics(apiUser.role)
+                    
+                    // Update FCM token for this device
+                    updateFcmTokenOnLogin(apiUser.id)
                     
                     _authState.value = AuthState.Success(apiUser)
                     return@launch
@@ -123,6 +130,26 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         if (passwordMatches) {
                             Log.d("AuthViewModel", "✅ Local Login Success: ${localUser.firstName} ${localUser.lastName}")
                             
+                            // ☁️ SYNC ADMIN TO CLOUD: If admin logs in locally, try to sync to cloud
+                            if (localUser.role == "Admin" && localUser.username == "admin") {
+                                try {
+                                    Log.d("AuthViewModel", "☁️ Syncing admin to cloud...")
+                                    val syncResult = apiRepository.register(
+                                        username = localUser.username,
+                                        password = password, // Use plain password for registration
+                                        firstName = localUser.firstName,
+                                        lastName = localUser.lastName,
+                                        role = "Admin"
+                                    )
+                                    if (syncResult.isSuccess) {
+                                        Log.d("AuthViewModel", "✅ Admin synced to cloud successfully")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w("AuthViewModel", "⚠️ Admin cloud sync failed (may already exist): ${e.message}")
+                                    // Continue with local login even if sync fails
+                                }
+                            }
+                            
                             // Use actual role from database, no auto-detection
                             preferencesManager.saveUserSession(
                                 userId = localUser.id,
@@ -138,11 +165,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                                     preferencesManager.hasSelectedProfilePicture = true
                                 }
                                 else -> {
-                                    if (!localUser.profileCompleted) {
-                                        preferencesManager.hasSelectedProfilePicture = false
-                                    }
+                                    // If user already completed profile, skip selection
+                                    val hasProfile = !localUser.profilePhotoUri.isNullOrEmpty() || localUser.profileCompleted
+                                    preferencesManager.hasSelectedProfilePicture = hasProfile
                                 }
                             }
+                            
+                            // Subscribe to FCM topics based on role
+                            FCMHelper.subscribeToTopics(localUser.role)
+                            
+                            // Update FCM token for this device
+                            updateFcmTokenOnLogin(localUser.id)
                             
                             _authState.value = AuthState.Success(localUser)
                             return@launch
@@ -183,6 +216,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     // Save to local database
                     repository.insertUser(apiUser)
                     
+                    // Update FCM token for this device (so user can receive notifications immediately)
+                    updateFcmTokenOnLogin(apiUser.id)
+                    
                     preferencesManager.hasSelectedProfilePicture = false
                     _authState.value = AuthState.Success(apiUser)
                     return@launch
@@ -216,6 +252,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     
                     val userId = repository.insertUser(newUser)
                     
+                    // Update FCM token for this device (so user can receive notifications immediately)
+                    updateFcmTokenOnLogin(userId.toInt())
+                    
                     preferencesManager.hasSelectedProfilePicture = false
                     _authState.value = AuthState.Success(newUser.copy(id = userId.toInt()))
                 }
@@ -227,6 +266,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun logout() {
+        // Unsubscribe from FCM topics
+        FCMHelper.unsubscribeFromAllTopics()
+        
         preferencesManager.clearSession()
         _authState.value = AuthState.Idle
     }
@@ -255,9 +297,21 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             // Hash new password
             val hashedNewPassword = SecurityUtils.hashPassword(newPassword)
             
-            // Update user password
+            // Update user password locally
             val updatedUser = user.copy(password = hashedNewPassword)
             repository.updateUser(updatedUser)
+            
+            // Sync to cloud API
+            try {
+                val result = apiRepository.updateUserPassword(userId, hashedNewPassword)
+                if (result.isSuccess) {
+                    Log.d("AuthViewModel", "✅ Password synced to cloud successfully")
+                } else {
+                    Log.e("AuthViewModel", "⚠️ Failed to sync password to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "❌ Error syncing password to cloud: ${e.message}", e)
+            }
             
             true
         } catch (e: Exception) {
@@ -275,13 +329,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 return false // Username already taken
             }
             
-            // Update user profile
+            // Update user profile locally
             val updatedUser = user.copy(
                 firstName = firstName,
                 lastName = lastName,
                 username = username
             )
             repository.updateUser(updatedUser)
+            
+            // Sync to cloud API
+            try {
+                val result = apiRepository.updateUserInfo(userId, firstName, lastName, username)
+                if (result.isSuccess) {
+                    Log.d("AuthViewModel", "✅ Profile synced to cloud successfully")
+                } else {
+                    Log.e("AuthViewModel", "⚠️ Failed to sync profile to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "❌ Error syncing profile to cloud: ${e.message}", e)
+            }
             
             true
         } catch (e: Exception) {
@@ -382,10 +448,122 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val user = repository.getUserById(userId)
             if (user != null) {
                 val updatedUser = user.copy(profileCompleted = true)
+                
+                // Update local database
                 repository.updateUser(updatedUser)
+                
+                // TODO: Sync to cloud
+                // apiRepository.updateUserProfile(userId, profileCompleted = true)
+                
+                Log.d("AuthViewModel", "✅ Profile marked as completed for user $userId")
             }
         } catch (e: Exception) {
-            // Handle error silently
+            Log.e("AuthViewModel", "❌ Error marking profile completed: ${e.message}", e)
+        }
+    }
+    
+    suspend fun updateUserProfile(userId: Int, profilePhotoUri: String) {
+        try {
+            val user = repository.getUserById(userId)
+            if (user != null) {
+                val updatedUser = user.copy(
+                    profilePhotoUri = profilePhotoUri,
+                    profileCompleted = true
+                )
+                
+                // Update local database first
+                repository.updateUser(updatedUser)
+                Log.d("AuthViewModel", "✅ Profile updated locally for user $userId")
+                
+                // Sync to cloud
+                try {
+                    val result = apiRepository.updateUserProfile(userId, profilePhotoUri)
+                    if (result.isSuccess) {
+                        Log.d("AuthViewModel", "✅ Profile synced to cloud successfully")
+                    } else {
+                        Log.w("AuthViewModel", "⚠️ Failed to sync profile to cloud: ${result.exceptionOrNull()?.message}")
+                    }
+                } catch (e: Exception) {
+                    Log.w("AuthViewModel", "⚠️ Cloud sync failed (will retry later): ${e.message}")
+                    // Continue even if cloud sync fails - profile is saved locally
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AuthViewModel", "❌ Error updating profile: ${e.message}", e)
+        }
+    }
+    
+    // Get user by ID (with cloud sync)
+    suspend fun getUserById(userId: Int): User? {
+        return try {
+            // Try to sync from cloud first
+            try {
+                Log.d("AuthViewModel", "🔄 Syncing user $userId from cloud...")
+                val result = apiRepository.getUserFromCloud(userId)
+                if (result.isSuccess) {
+                    val cloudUser = result.getOrNull()
+                    if (cloudUser != null) {
+                        // Update local database with cloud data
+                        repository.insertUser(cloudUser)
+                        Log.d("AuthViewModel", "✅ User synced from cloud")
+                        return cloudUser
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "⚠️ Cloud sync failed, using local data: ${e.message}")
+            }
+            
+            // Fallback to local database
+            repository.getUserById(userId)
+        } catch (e: Exception) {
+            Log.e("AuthViewModel", "❌ Error getting user: ${e.message}", e)
+            null
+        }
+    }
+    
+    // Get all users (for admin notification sender)
+    suspend fun getAllUsersSync(): List<User> {
+        return try {
+            repository.getAllUsersSync()
+        } catch (e: Exception) {
+            Log.e("AuthViewModel", "❌ Error getting all users: ${e.message}", e)
+            emptyList()
+        }
+    }
+    
+    // Update FCM token on login for multi-device support
+    private fun updateFcmTokenOnLogin(userId: Int) {
+        viewModelScope.launch {
+            try {
+                // Get current FCM token from Firebase
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { token ->
+                        viewModelScope.launch {
+                            try {
+                                Log.d("AuthViewModel", "🔥 Updating FCM token for user $userId on this device")
+                                val deviceId = android.provider.Settings.Secure.getString(
+                                    getApplication<Application>().contentResolver,
+                                    android.provider.Settings.Secure.ANDROID_ID
+                                )
+                                
+                                // Update token in cloud
+                                val result = apiRepository.updateFcmToken(userId, token, deviceId)
+                                if (result.isSuccess) {
+                                    Log.d("AuthViewModel", "✅ FCM token updated successfully for multi-device support")
+                                } else {
+                                    Log.w("AuthViewModel", "⚠️ Failed to update FCM token: ${result.exceptionOrNull()?.message}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "❌ Error updating FCM token: ${e.message}", e)
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("AuthViewModel", "❌ Failed to get FCM token: ${e.message}", e)
+                    }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "❌ Error in updateFcmTokenOnLogin: ${e.message}", e)
+            }
         }
     }
     

@@ -26,6 +26,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_NOTIFICATION_SOUND = "notification_sound"
         private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
         private const val KEY_LAST_USER_ID = "last_user_id"
+        private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_PERMISSIONS_GRANTED = "permissions_granted"
     }
     
     var isLoggedIn: Boolean
@@ -85,12 +87,36 @@ class PreferencesManager(context: Context) {
         }
     
     var profileEmoji: String?
-        get() = prefs.getString(KEY_PROFILE_EMOJI, "👤")
-        set(value) = prefs.edit().putString(KEY_PROFILE_EMOJI, value).apply()
+        get() {
+            val currentUserId = userId
+            return if (currentUserId > 0) {
+                prefs.getString("profile_emoji_$currentUserId", "👤")
+            } else {
+                "👤"
+            }
+        }
+        set(value) {
+            val currentUserId = userId
+            if (currentUserId > 0) {
+                prefs.edit().putString("profile_emoji_$currentUserId", value).apply()
+            }
+        }
     
     var profileImageUri: String?
-        get() = prefs.getString("profile_image_uri", null)
-        set(value) = prefs.edit().putString("profile_image_uri", value).apply()
+        get() {
+            val currentUserId = userId
+            return if (currentUserId > 0) {
+                prefs.getString("profile_image_uri_$currentUserId", null)
+            } else {
+                null
+            }
+        }
+        set(value) {
+            val currentUserId = userId
+            if (currentUserId > 0) {
+                prefs.edit().putString("profile_image_uri_$currentUserId", value).apply()
+            }
+        }
     
     var hasSelectedProfilePicture: Boolean
         get() {
@@ -227,6 +253,15 @@ class PreferencesManager(context: Context) {
         }
     }
     
+    // FCM Token
+    var fcmToken: String?
+        get() = prefs.getString(KEY_FCM_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_FCM_TOKEN, value).apply()
+    
+    var permissionsGranted: Boolean
+        get() = prefs.getBoolean(KEY_PERMISSIONS_GRANTED, false)
+        set(value) = prefs.edit().putBoolean(KEY_PERMISSIONS_GRANTED, value).apply()
+    
     fun clearSession() {
         prefs.edit().apply {
             remove(KEY_IS_LOGGED_IN)
@@ -236,7 +271,9 @@ class PreferencesManager(context: Context) {
             remove(KEY_FIRST_NAME)
             remove(KEY_LAST_NAME)
             remove(KEY_PROFILE_PHOTO)
-            // DON'T remove hasSelectedProfilePicture - it's per-user now
+            // DON'T remove per-user profile data (profile_image_uri_*, profile_emoji_*, etc.)
+            // DON'T remove FCM token - it's device-specific, not user-specific
+            // This allows users to keep their profile pictures when they log back in
             apply()
         }
     }

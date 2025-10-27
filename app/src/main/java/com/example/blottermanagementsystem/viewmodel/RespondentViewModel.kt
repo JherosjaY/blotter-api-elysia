@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.*
+import com.example.blottermanagementsystem.data.repository.ApiRepository
 import com.example.blottermanagementsystem.data.repository.BlotterRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 class RespondentViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = BlotterDatabase.getDatabase(application)
+    private val apiRepository = ApiRepository()
     private val repository = BlotterRepository(
         userDao = database.userDao(),
         blotterReportDao = database.blotterReportDao(),
@@ -90,7 +92,33 @@ class RespondentViewModel(application: Application) : AndroidViewModel(applicati
             cooperationStatus = "Not Contacted"
         )
         
-        // Save to local Room database
+        // Try to sync to cloud first
+        try {
+            Log.d("RespondentViewModel", "📝 Adding respondent to cloud...")
+            val result = apiRepository.createRespondent(respondent)
+            if (result.isSuccess) {
+                val cloudRespondent = result.getOrNull()
+                if (cloudRespondent != null) {
+                    val respondentId = repository.insertRespondent(cloudRespondent)
+                    Log.d("RespondentViewModel", "✅ Respondent synced to cloud and local")
+                    
+                    // Log to person history
+                    val history = PersonHistory(
+                        personId = personId,
+                        blotterReportId = blotterReportId,
+                        activityType = PersonActivityType.ADDED_AS_RESPONDENT,
+                        description = "Added as respondent: $accusation"
+                    )
+                    repository.insertHistory(history)
+                    
+                    return respondentId
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("RespondentViewModel", "❌ Error syncing respondent: ${e.message}", e)
+        }
+        
+        // Fallback: Save to local only
         val respondentId = repository.insertRespondent(respondent)
         
         // Log to person history

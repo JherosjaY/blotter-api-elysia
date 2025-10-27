@@ -1,6 +1,10 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
+import FCM from "../backend-fcm-helper.js";
+
+// Initialize Firebase Cloud Messaging
+FCM.initializeFCM();
 
 // Import routes
 import { authRoutes } from "./routes/auth";
@@ -15,6 +19,8 @@ import { evidenceRoutes } from "./routes/evidence";
 import { hearingsRoutes } from "./routes/hearings";
 import { resolutionsRoutes } from "./routes/resolutions";
 import { activityLogsRoutes } from "./routes/activityLogs";
+import { notificationsRoutes } from "./routes/notifications";
+import { respondentsRoutes } from "./routes/respondents";
 
 export const app = new Elysia()
   .use(
@@ -53,6 +59,8 @@ export const app = new Elysia()
       hearings: "/api/hearings",
       resolutions: "/api/resolutions",
       activityLogs: "/api/activity-logs",
+      notifications: "/api/notifications",
+      respondents: "/api/respondents",
     },
   }))
   .get("/health", () => ({
@@ -75,6 +83,8 @@ export const app = new Elysia()
       .use(hearingsRoutes)
       .use(resolutionsRoutes)
       .use(activityLogsRoutes)
+      .use(notificationsRoutes)
+      .use(respondentsRoutes)
   )
   .listen(process.env.PORT || 3000);
 

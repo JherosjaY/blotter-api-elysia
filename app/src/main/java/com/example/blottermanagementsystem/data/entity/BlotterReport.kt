@@ -44,5 +44,6 @@ data class BlotterReport(
     // Evidence fields (stored as JSON strings)
     val imageUris: String = "", // JSON array of image URI strings
     val videoUris: String = "", // JSON array of video URI strings
-    val videoDurations: String = "" // JSON object mapping video URIs to durations
+    val videoDurations: String = "", // JSON object mapping video URIs to durations
+    val audioUri: String = "" // Audio recording file path (local or cloud URL)
 )

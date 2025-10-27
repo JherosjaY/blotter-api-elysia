@@ -210,7 +210,7 @@ abstract class BlotterDatabase : RoomDatabase() {
             )
             statuses.forEach { statusDao.insertStatus(it) }
             
-            // Insert default admin user
+            // Insert default admin user (local + will sync to cloud on first login)
             val adminPassword = hashPassword("admin123")
             val adminUser = User(
                 firstName = "System",

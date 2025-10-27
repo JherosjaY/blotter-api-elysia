@@ -13,6 +13,8 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").default(true),
   profileCompleted: boolean("profile_completed").default(false),
   mustChangePassword: boolean("must_change_password").default(false),
+  fcmToken: text("fcm_token"), // Firebase Cloud Messaging token
+  deviceId: varchar("device_id", { length: 255 }), // Device identifier
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -29,12 +31,14 @@ export const blotterReports = pgTable("blotter_reports", {
   complainantName: varchar("complainant_name", { length: 200 }),
   complainantContact: varchar("complainant_contact", { length: 50 }),
   complainantAddress: text("complainant_address"),
+  complainantEmail: varchar("complainant_email", { length: 100 }),
   status: varchar("status", { length: 50 }).notNull().default("Pending"),
   priority: varchar("priority", { length: 20 }).default("Normal"),
   assignedOfficer: varchar("assigned_officer", { length: 200 }),
   assignedOfficerIds: text("assigned_officer_ids"),
   filedBy: varchar("filed_by", { length: 200 }),
   filedById: integer("filed_by_id"),
+  audioRecordingUri: text("audio_recording_uri"),
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -204,4 +208,71 @@ export const caseTemplates = pgTable("case_templates", {
   createdBy: varchar("created_by", { length: 200 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Case Timeline Table
+export const caseTimeline = pgTable("case_timeline", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  eventDescription: text("event_description").notNull(),
+  performedBy: varchar("performed_by", { length: 200 }),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// KP Forms Table
+export const kpForms = pgTable("kp_forms", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  formType: varchar("form_type", { length: 100 }).notNull(),
+  formData: text("form_data").notNull(),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Mediation Sessions Table
+export const mediationSessions = pgTable("mediation_sessions", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  sessionDate: varchar("session_date", { length: 50 }).notNull(),
+  sessionTime: varchar("session_time", { length: 50 }).notNull(),
+  mediator: varchar("mediator", { length: 200 }),
+  outcome: text("outcome"),
+  status: varchar("status", { length: 50 }).default("Scheduled"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Status Table
+export const statuses = pgTable("statuses", {
+  id: serial("id").primaryKey(),
+  statusName: varchar("status_name", { length: 100 }).notNull().unique(),
+  statusDescription: text("status_description"),
+  statusColor: varchar("status_color", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Status History Table
+export const statusHistory = pgTable("status_history", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  oldStatus: varchar("old_status", { length: 50 }),
+  newStatus: varchar("new_status", { length: 50 }).notNull(),
+  changedBy: varchar("changed_by", { length: 200 }),
+  reason: text("reason"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Summons Table
+export const summons = pgTable("summons", {
+  id: serial("id").primaryKey(),
+  blotterReportId: integer("blotter_report_id").notNull(),
+  respondentId: integer("respondent_id"),
+  summonNumber: varchar("summon_number", { length: 50 }).notNull().unique(),
+  issueDate: varchar("issue_date", { length: 50 }).notNull(),
+  hearingDate: varchar("hearing_date", { length: 50 }).notNull(),
+  status: varchar("status", { length: 50 }).default("Issued"),
+  servedDate: varchar("served_date", { length: 50 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
 });

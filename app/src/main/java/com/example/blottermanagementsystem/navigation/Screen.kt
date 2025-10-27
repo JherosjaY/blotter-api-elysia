@@ -2,6 +2,7 @@ package com.example.blottermanagementsystem.navigation
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
+    object PermissionsSetup : Screen("permissions_setup")
     object Login : Screen("login")
     object Register : Screen("register")
     object ForcePasswordChange : Screen("force_password_change/{userId}/{currentUsername}") {
@@ -130,4 +131,5 @@ sealed class Screen(val route: String) {
     object IncidentMap : Screen("incident_map")
     object VoiceToText : Screen("voice_to_text")
     object SyncSettings : Screen("sync_settings")
+    object AdminNotificationSender : Screen("admin_notification_sender")
 }

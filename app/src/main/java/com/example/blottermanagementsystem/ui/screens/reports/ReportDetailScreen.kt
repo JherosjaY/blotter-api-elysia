@@ -59,7 +59,7 @@ fun ReportDetailScreen(
     val respondents by respondentViewModel.getRespondentsByReportId(reportId).collectAsState(initial = emptyList())
     
     // For officer assignment
-    val allOfficers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
+    val allOfficers by viewModel.allOfficers.collectAsState()
     var showAssignDialog by remember { mutableStateOf(false) }
     var showUpdateStatusDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }

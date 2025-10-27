@@ -29,14 +29,14 @@ fun DashboardTopBar(
     subtitle: String,
     firstName: String,
     notificationCount: Int = 0,
+    profileImageUri: String? = null,
+    profileEmoji: String = "👤",
     onNavigateToNotifications: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
     val userRole = preferencesManager.userRole ?: "User"
-    val profileImageUri = preferencesManager.profileImageUri
-    val profileEmoji = preferencesManager.profileEmoji ?: "👤"
     
     TopAppBar(
         title = {
@@ -86,8 +86,22 @@ fun DashboardTopBar(
                             )
                         } else {
                             if (profileImageUri != null) {
+                                val imageUri = when {
+                                    profileImageUri.startsWith("http://") || profileImageUri.startsWith("https://") -> {
+                                        // It's a cloud URL (Cloudinary)
+                                        profileImageUri
+                                    }
+                                    profileImageUri.startsWith("/") -> {
+                                        // It's a file path
+                                        Uri.fromFile(java.io.File(profileImageUri))
+                                    }
+                                    else -> {
+                                        // It's a content URI
+                                        Uri.parse(profileImageUri)
+                                    }
+                                }
                                 Image(
-                                    painter = rememberAsyncImagePainter(Uri.parse(profileImageUri)),
+                                    painter = rememberAsyncImagePainter(imageUri),
                                     contentDescription = "Profile Picture",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop

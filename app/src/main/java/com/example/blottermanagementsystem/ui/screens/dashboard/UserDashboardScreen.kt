@@ -37,6 +37,7 @@ import com.example.blottermanagementsystem.utils.rememberPaginationState
 import com.example.blottermanagementsystem.utils.PreferencesManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import com.example.blottermanagementsystem.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -52,11 +53,31 @@ fun UserDashboardScreen(
     onNavigateToProfile: () -> Unit,
     onLogout: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel(),
-    notificationViewModel: NotificationViewModel = viewModel()
+    notificationViewModel: NotificationViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preferencesManager = remember { PreferencesManager(context) }
+    
+    var profileImageUri by remember { mutableStateOf<String?>(null) }
+    var profileEmoji by remember { mutableStateOf("👤") }
+    
+    // Load profile photo from database
+    LaunchedEffect(userId) {
+        scope.launch {
+            val user = authViewModel.getUserById(userId)
+            if (user != null && !user.profilePhotoUri.isNullOrEmpty()) {
+                val photoUri = user.profilePhotoUri!!
+                if (photoUri.startsWith("emoji:")) {
+                    profileEmoji = photoUri.removePrefix("emoji:")
+                    profileImageUri = null
+                } else {
+                    profileImageUri = photoUri
+                }
+            }
+        }
+    }
     
     val allReports by viewModel.allReports.collectAsState(initial = emptyList())
     val notifications by notificationViewModel.getNotificationsByUser(userId).collectAsState(initial = emptyList())
@@ -89,6 +110,8 @@ fun UserDashboardScreen(
                 subtitle = "Data Entry & Management",
                 firstName = firstName,
                 notificationCount = unreadCount,
+                profileImageUri = profileImageUri,
+                profileEmoji = profileEmoji,
                 onNavigateToNotifications = onNavigateToNotifications,
                 onNavigateToProfile = onNavigateToProfile
             )

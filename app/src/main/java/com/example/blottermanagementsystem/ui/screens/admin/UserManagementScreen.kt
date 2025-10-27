@@ -37,7 +37,7 @@ fun UserManagementScreen(
     val users by viewModel.allUsers.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var selectedUser by remember { mutableStateOf<User?>(null) }
-    var showDeactivateDialog by remember { mutableStateOf(false) }
+    var showTerminateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
     // Optimized: Debounced search for better performance
@@ -148,7 +148,7 @@ fun UserManagementScreen(
                             user = user,
                             onToggleStatus = {
                                 selectedUser = user
-                                showDeactivateDialog = true
+                                showTerminateDialog = true
                             },
                             onDelete = {
                                 selectedUser = user
@@ -181,14 +181,14 @@ fun UserManagementScreen(
         }
     }
     
-    // Deactivate/Activate Dialog
-    if (showDeactivateDialog && selectedUser != null) {
+    // Terminate/Activate Dialog
+    if (showTerminateDialog && selectedUser != null) {
         val isActive = selectedUser!!.isActive
         AlertDialog(
-            onDismissRequest = { showDeactivateDialog = false },
+            onDismissRequest = { showTerminateDialog = false },
             title = {
                 Text(
-                    text = if (isActive) "Deactivate User?" else "Activate User?",
+                    text = if (isActive) "Terminate User?" else "Activate User?",
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -206,7 +206,7 @@ fun UserManagementScreen(
                     onClick = {
                         scope.launch {
                             viewModel.toggleUserStatus(selectedUser!!.id)
-                            showDeactivateDialog = false
+                            showTerminateDialog = false
                             selectedUser = null
                         }
                     },
@@ -214,11 +214,11 @@ fun UserManagementScreen(
                         containerColor = if (isActive) ErrorRed else SuccessGreen
                     )
                 ) {
-                    Text(if (isActive) "Deactivate" else "Activate")
+                    Text(if (isActive) "Terminate" else "Activate")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeactivateDialog = false }) {
+                TextButton(onClick = { showTerminateDialog = false }) {
                     Text("Cancel")
                 }
             },
@@ -424,12 +424,14 @@ private fun UserCard(
                         Icon(
                             imageVector = if (user.isActive) Icons.Default.Block else Icons.Default.CheckCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (user.isActive) "Deactivate" else "Activate",
-                            fontSize = 13.sp
+                            text = if (user.isActive) "Terminate" else "Activate",
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                     

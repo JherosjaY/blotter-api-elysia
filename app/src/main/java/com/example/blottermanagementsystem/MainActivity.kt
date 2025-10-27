@@ -28,8 +28,13 @@ import com.example.blottermanagementsystem.ui.screens.LoadingScreen
 import com.example.blottermanagementsystem.ui.theme.BlotterManagementSystemTheme
 import com.example.blottermanagementsystem.data.database.BlotterDatabase
 import com.example.blottermanagementsystem.data.entity.User
+import com.example.blottermanagementsystem.data.repository.ApiRepository
+import com.example.blottermanagementsystem.ui.components.UpdateDialog
+import com.example.blottermanagementsystem.utils.FCMHelper
 import com.example.blottermanagementsystem.utils.PreferencesManager
+import com.example.blottermanagementsystem.utils.PushNotificationHelper
 import com.example.blottermanagementsystem.utils.SecurityUtils
+import com.example.blottermanagementsystem.utils.VersionChecker
 import com.example.blottermanagementsystem.viewmodel.AuthViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +51,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         preferencesManager = PreferencesManager(this)
+        
+        // Initialize notification channels
+        PushNotificationHelper.createNotificationChannels(this)
+        
+        // Initialize Firebase Cloud Messaging
+        FCMHelper.initializeFCM(this)
         
         // Setup lifecycle observer for admin auto-logout
         setupAdminAutoLogout()
@@ -70,6 +81,73 @@ class MainActivity : ComponentActivity() {
                         val authViewModel: AuthViewModel = viewModel()
                         val context = LocalContext.current
                         
+                        // Version check state
+                        var showUpdateDialog by remember { mutableStateOf(false) }
+                        var versionInfo by remember { mutableStateOf<VersionChecker.VersionInfo?>(null) }
+                        
+                        // Check for app updates
+                        LaunchedEffect(Unit) {
+                            val apiRepository = ApiRepository(context)
+                            val updateInfo = VersionChecker.checkForUpdate(context, apiRepository)
+                            if (updateInfo != null) {
+                                versionInfo = updateInfo
+                                showUpdateDialog = true
+                            }
+                        }
+                        
+                        // Show update dialog if available
+                        if (showUpdateDialog && versionInfo != null) {
+                            UpdateDialog(
+                                currentVersion = versionInfo!!.currentVersionName,
+                                latestVersion = versionInfo!!.latestVersionName,
+                                updateMessage = versionInfo!!.updateMessage,
+                                forceUpdate = versionInfo!!.forceUpdate,
+                                updateUrl = versionInfo!!.updateUrl,
+                                onDismiss = {
+                                    showUpdateDialog = false
+                                    if (!versionInfo!!.forceUpdate) {
+                                        VersionChecker.dismissVersion(context, versionInfo!!.latestVersion)
+                                    }
+                                }
+                            )
+                        }
+                        
+                        // Handle notification navigation
+                        LaunchedEffect(Unit) {
+                            intent?.let { notificationIntent ->
+                                val navigateTo = notificationIntent.getStringExtra("navigate_to")
+                                val caseId = notificationIntent.getIntExtra("case_id", -1)
+                                val notificationId = notificationIntent.getIntExtra("notification_id", -1)
+                                
+                                // Mark notification as read when tapped from system tray
+                                if (notificationId != -1) {
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        try {
+                                            val database = BlotterDatabase.getDatabase(this@MainActivity)
+                                            val notificationDao = database.notificationDao()
+                                            notificationDao.markAsRead(notificationId)
+                                        } catch (e: Exception) {
+                                            // Ignore errors
+                                        }
+                                    }
+                                }
+                                
+                                when (navigateTo) {
+                                    "case_detail" -> {
+                                        if (caseId != -1) {
+                                            // Wait for navigation to be ready
+                                            kotlinx.coroutines.delay(500)
+                                            navController.navigate("report_detail/$caseId")
+                                        }
+                                    }
+                                    "notifications" -> {
+                                        kotlinx.coroutines.delay(500)
+                                        navController.navigate(Screen.Notifications.route)
+                                    }
+                                }
+                            }
+                        }
+                        
                         // Double-tap back to exit
                         var backPressedTime by remember { mutableStateOf(0L) }
                         var backPressedOnce by remember { mutableStateOf(false) }
@@ -77,6 +155,7 @@ class MainActivity : ComponentActivity() {
                         // Determine start destination
                         val startDestination = when {
                             !preferencesManager.onboardingCompleted -> Screen.Onboarding.route
+                            !preferencesManager.permissionsGranted -> Screen.PermissionsSetup.route
                             !preferencesManager.isLoggedIn -> Screen.Login.route
                             !preferencesManager.hasSelectedProfilePicture -> Screen.ProfilePictureSelection.route
                             else -> {
@@ -173,7 +252,7 @@ class MainActivity : ComponentActivity() {
             val adminUser = userDao.getUserByUsername("admin")
             
             if (adminUser == null) {
-                // Create admin user
+                // Create admin user (will sync to cloud on first login)
                 val hashedPassword = SecurityUtils.hashPassword("admin123")
                 val admin = User(
                     firstName = "System",

@@ -36,7 +36,7 @@ fun OfficerManagementScreen(
     onNavigateBack: () -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val officers by viewModel.getAllOfficers().collectAsState(initial = emptyList())
+    val officers by viewModel.allOfficers.collectAsState()
     val scope = rememberCoroutineScope()
     var searchQuery by rememberDebouncedState("", delayMillis = 300)
     var showAddDialog by remember { mutableStateOf(false) }

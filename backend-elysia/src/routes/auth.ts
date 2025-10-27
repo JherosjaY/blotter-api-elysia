@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 export const authRoutes = new Elysia({ prefix: "/auth" })
   // Login
@@ -19,8 +20,27 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Invalid credentials" };
       }
 
-      // TODO: Add password hashing verification (bcrypt)
-      if (user.password !== password) {
+      // Verify password (support both bcrypt and plain text for migration)
+      let passwordMatch = false;
+      
+      // Check if password is hashed (bcrypt hashes start with $2b$)
+      if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
+        // Bcrypt hashed password
+        passwordMatch = await bcrypt.compare(password, user.password);
+      } else {
+        // Plain text password (old users)
+        passwordMatch = user.password === password;
+        
+        // If login successful, upgrade to bcrypt
+        if (passwordMatch) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await db.update(users)
+            .set({ password: hashedPassword })
+            .where(eq(users.id, user.id));
+        }
+      }
+      
+      if (!passwordMatch) {
         set.status = 401;
         return { success: false, message: "Invalid credentials" };
       }
@@ -58,11 +78,11 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     }
   )
 
-  // Register (Public - User role only)
+  // Register (Public - User role only, but accepts role parameter for admin/officer creation)
   .post(
     "/register",
     async ({ body, set }) => {
-      const { username, password, firstName, lastName } = body;
+      const { username, password, firstName, lastName, role } = body;
 
       // Check if username exists
       const existingUser = await db.query.users.findFirst({
@@ -74,16 +94,20 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         return { success: false, message: "Username already exists" };
       }
 
-      // Public registration always creates "User" role
-      // Officers and Admins must be created by Admin through user management
+      // Hash password with bcrypt
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Use provided role or default to "User" for public registration
+      const userRole = role || "User";
+      
       const [newUser] = await db
         .insert(users)
         .values({
           username,
-          password, // TODO: Add password hashing (bcrypt)
+          password: hashedPassword,
           firstName,
           lastName,
-          role: "User", // Force User role for public registration
+          role: userRole,
           isActive: true,
           profileCompleted: false,
           mustChangePassword: false,
@@ -115,6 +139,56 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         password: t.String(),
         firstName: t.String(),
         lastName: t.String(),
+        role: t.Optional(t.String()),
+      }),
+    }
+  )
+  
+  // Update User Profile (Profile Photo & Completion)
+  .put(
+    "/profile/:userId",
+    async ({ params, body, set }) => {
+      try {
+        const userId = parseInt(params.userId);
+        const { profilePhotoUri, profileCompleted } = body;
+
+        // Update user profile
+        const [updatedUser] = await db
+          .update(users)
+          .set({
+            profilePhotoUri: profilePhotoUri,
+            profileCompleted: profileCompleted ?? true,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+          .returning();
+
+        if (!updatedUser) {
+          set.status = 404;
+          return {
+            success: false,
+            message: "User not found",
+          };
+        }
+
+        return {
+          success: true,
+          message: "Profile updated successfully",
+          user: updatedUser,
+        };
+      } catch (error: any) {
+        set.status = 500;
+        return {
+          success: false,
+          message: "Failed to update profile",
+          error: error.message,
+        };
+      }
+    },
+    {
+      body: t.Object({
+        profilePhotoUri: t.String(),
+        profileCompleted: t.Optional(t.Boolean()),
       }),
     }
   );

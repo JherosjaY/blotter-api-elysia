@@ -46,7 +46,11 @@ fun NotificationsScreen(
     var selectedNotifications by remember { mutableStateOf(setOf<Int>()) }
     var isSelectionMode by remember { mutableStateOf(false) }
     
-    // Optimized: Pagination for large notification lists
+    // Sync notifications from cloud on load
+    LaunchedEffect(userId) {
+        notificationViewModel.syncNotificationsFromCloud(userId)
+    }
+    
     val paginationState = rememberPaginationState(notifications, pageSize = 20)
     
     // Function to mark notification as read

@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { blotterReports } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
+import FCM from "../../backend-fcm-helper.js";
 
 export const reportsRoutes = new Elysia({ prefix: "/reports" })
   // Get all reports
@@ -42,6 +43,22 @@ export const reportsRoutes = new Elysia({ prefix: "/reports" })
         .values(body)
         .returning();
 
+      // Send notification to all admins about new case
+      try {
+        await FCM.notifyAdminsNewCase(
+          newReport.caseNumber,
+          newReport.id,
+          newReport.complainantName || "Unknown"
+        );
+        
+        // If filed by a user, notify them that case was filed successfully
+        if (body.filedById) {
+          await FCM.notifyUserCaseFiled(db, body.filedById, newReport.caseNumber);
+        }
+      } catch (error) {
+        console.error("Failed to send notification:", error);
+      }
+
       return {
         success: true,
         data: newReport,
@@ -70,6 +87,11 @@ export const reportsRoutes = new Elysia({ prefix: "/reports" })
   .put(
     "/:id",
     async ({ params, body, set }) => {
+      // Get old report data before update
+      const oldReport = await db.query.blotterReports.findFirst({
+        where: eq(blotterReports.id, parseInt(params.id)),
+      });
+
       const [updatedReport] = await db
         .update(blotterReports)
         .set({ ...body, updatedAt: new Date() })
@@ -79,6 +101,48 @@ export const reportsRoutes = new Elysia({ prefix: "/reports" })
       if (!updatedReport) {
         set.status = 404;
         return { success: false, message: "Report not found" };
+      }
+
+      // Send notifications based on what changed
+      try {
+        // If status changed, notify complainant
+        if (body.status && oldReport && body.status !== oldReport.status && updatedReport.filedById) {
+          await FCM.notifyUserStatusUpdate(
+            db,
+            updatedReport.filedById,
+            updatedReport.caseNumber,
+            oldReport.status,
+            body.status
+          );
+        }
+
+        // If officer assigned, notify officer and complainant
+        if (body.assignedOfficerIds && oldReport && body.assignedOfficerIds !== oldReport.assignedOfficerIds) {
+          const officerIds = body.assignedOfficerIds.split(',').map(id => parseInt(id.trim()));
+          
+          for (const officerId of officerIds) {
+            await FCM.notifyOfficerCaseAssigned(
+              db,
+              officerId,
+              updatedReport.caseNumber,
+              updatedReport.id,
+              updatedReport.incidentType
+            );
+          }
+
+          // Notify complainant about officer assignment
+          if (updatedReport.filedById && body.assignedOfficer) {
+            await FCM.notifyUserOfficerAssigned(
+              db,
+              updatedReport.filedById,
+              updatedReport.caseNumber,
+              body.assignedOfficer,
+              "N/A"
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Failed to send notification:", error);
       }
 
       return {
