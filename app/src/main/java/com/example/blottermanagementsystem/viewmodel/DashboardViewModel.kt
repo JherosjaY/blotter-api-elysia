@@ -1068,6 +1068,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.e("DashboardViewModel", "❌ Error syncing user status to cloud: ${e.message}", e)
             }
             
+            // Send notification to user
+            try {
+                val notification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = userId,
+                    title = if (newStatus) "Account Activated" else "Account Terminated",
+                    message = if (newStatus) 
+                        "Your account has been activated by the administrator. You can now login and access the system." 
+                    else 
+                        "Your account has been terminated by the administrator. You can no longer access the system. Please contact the Barangay office for more information.",
+                    type = if (newStatus) "ACCOUNT_ACTIVATED" else "ACCOUNT_TERMINATED",
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(notification)
+                Log.d("DashboardViewModel", "📧 Notification sent to user about account $statusText")
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Failed to send notification: ${e.message}", e)
+            }
+            
             // Log activity
             logActivity(
                 action = if (newStatus) "USER_ACTIVATED" else "USER_TERMINATED",
@@ -1099,6 +1118,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.e("DashboardViewModel", "❌ Error deleting user from cloud: ${e.message}", e)
             }
             
+            // Send notification to user BEFORE deleting
+            try {
+                val notification = com.example.blottermanagementsystem.data.entity.Notification(
+                    userId = userId,
+                    title = "Account Deleted",
+                    message = "Your account has been permanently deleted by the administrator. All your data has been removed from the system. If you believe this was done in error, please contact the Barangay office immediately.",
+                    type = "ACCOUNT_DELETED",
+                    isRead = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertNotification(notification)
+                Log.d("DashboardViewModel", "📧 Notification sent to user about account deletion")
+                
+                // Give user a chance to see notification (sync to cloud)
+                kotlinx.coroutines.delay(2000) // 2 seconds delay
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Failed to send notification: ${e.message}", e)
+            }
+            
             // Delete user's reports
             val userReports = repository.getReportsByUser(userId).first()
             userReports.forEach { report ->
@@ -1106,7 +1144,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
             Log.d("DashboardViewModel", "🗑️ Deleted ${userReports.size} reports by user")
             
-            // Delete user's notifications
+            // Delete user's notifications (including the deletion notice)
             repository.deleteAllNotificationsByUserId(userId)
             Log.d("DashboardViewModel", "🗑️ Deleted user notifications")
             
