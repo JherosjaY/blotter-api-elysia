@@ -199,33 +199,41 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun loadDashboardStats() {
         viewModelScope.launch {
             try {
-                // TEMPORARY: Load from local first, then sync from cloud
-                Log.d("DashboardViewModel", "📱 Loading dashboard stats from local database first...")
+                // Always load from local first for instant UI update
+                Log.d("DashboardViewModel", "📱 Loading dashboard stats from local database...")
                 loadDashboardStatsFromLocal()
                 
-                // Then try to sync from cloud in background
+                // Then sync from cloud in background
                 Log.d("DashboardViewModel", "📊 Syncing dashboard stats from cloud API...")
-                val result = apiRepository.getDashboardAnalytics()
+                val result = apiRepository.getDashboardStats()
                 
                 if (result.isSuccess) {
-                    val data = result.getOrNull()
-                    if (data != null) {
-                        _dashboardStats.value = DashboardStats(
-                            totalReports = data.totalReports,
-                            pendingReports = data.pendingReports,
-                            ongoingReports = data.ongoingReports,
-                            resolvedReports = data.resolvedReports,
-                            archivedReports = data.archivedReports,
-                            totalOfficers = data.totalOfficers,
-                            totalUsers = data.totalUsers
-                        )
-                        Log.d("DashboardViewModel", "✅ Dashboard stats synced from cloud: Users=${data.totalUsers}, Reports=${data.totalReports}")
+                    val cloudStats = result.getOrNull()
+                    if (cloudStats != null) {
+                        _dashboardStats.value = cloudStats
+                        Log.d("DashboardViewModel", "✅ Cloud stats loaded: Users=${cloudStats.totalUsers}, officers=${cloudStats.totalOfficers}, Reports=${cloudStats.totalReports}")
+                    } else {
+                        Log.w("DashboardViewModel", "⚠️ Failed to fetch cloud stats, using local data")
+                        // Reload from local to ensure fresh count
+                        loadDashboardStatsFromLocal()
                     }
                 } else {
-                    Log.e("DashboardViewModel", "❌ Failed to sync stats from cloud, using local data")
+                    Log.w("DashboardViewModel", "❌ Failed to fetch cloud stats, using local data")
+                    // Fallback to local database
+                    try {
+                        loadDashboardStatsFromLocal()
+                    } catch (localError: Exception) {
+                        Log.e("DashboardViewModel", "❌ Error loading local stats: ${localError.message}", localError)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "❌ Error syncing stats from cloud: ${e.message}, using local data", e)
+                Log.e("DashboardViewModel", "❌ Error loading dashboard stats: ${e.message}", e)
+                // Fallback to local database
+                try {
+                    loadDashboardStatsFromLocal()
+                } catch (localError: Exception) {
+                    Log.e("DashboardViewModel", "❌ Error loading local stats: ${localError.message}", localError)
+                }
             }
         }
     }
@@ -302,9 +310,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // Add refresh function for pull-to-refresh
     fun refreshDashboard() {
+        Log.d("DashboardViewModel", "🔄 Refreshing dashboard...")
         loadDashboardStats()
         loadRecentReports()
         loadAllReports()
+        syncUsersFromCloud() // Re-sync users from cloud
+        syncOfficersFromCloud() // Re-sync officers from cloud
+        syncReportsFromCloud() // Re-sync reports from cloud
     }
     
     suspend fun insertReport(report: BlotterReport, createdBy: String, creatorUserId: Int = 0): Long {
