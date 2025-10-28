@@ -85,6 +85,23 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun addOfficer(officer: Officer) {
         // Save to local Room database
         repository.insertOfficer(officer)
+        
+        // Sync to cloud API
+        viewModelScope.launch {
+            try {
+                Log.d("AdminViewModel", "📤 Syncing officer to cloud...")
+                val apiRepository = com.example.blottermanagementsystem.data.repository.ApiRepository()
+                val result = apiRepository.createOfficer(officer)
+                
+                if (result.isSuccess) {
+                    Log.d("AdminViewModel", "✅ Officer synced to cloud successfully!")
+                } else {
+                    Log.e("AdminViewModel", "❌ Failed to sync officer to cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "❌ Error syncing officer: ${e.message}", e)
+            }
+        }
     }
     
     suspend fun createAdminAccount(

@@ -13,7 +13,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material3.*
@@ -142,24 +144,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 text = {
-                                    Box(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(max = 400.dp)
+                                            .verticalScroll(rememberScrollState())
                                     ) {
-                                        androidx.compose.foundation.verticalScroll(
-                                            androidx.compose.foundation.rememberScrollState()
-                                        ).run {
-                                            Column(
-                                                modifier = Modifier.fillMaxWidth().then(this)
-                                            ) {
-                                                Text(
-                                                    text = whatsNewMessage,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 20.sp
-                                                )
-                                            }
-                                        }
+                                        Text(
+                                            text = whatsNewMessage,
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp
+                                        )
                                     }
                                 },
                                 confirmButton = {
