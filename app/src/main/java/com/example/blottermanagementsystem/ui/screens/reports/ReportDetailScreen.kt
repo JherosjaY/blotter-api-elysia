@@ -1300,6 +1300,7 @@ fun ReportDetailScreen(
                 }
             )
         }
+    } // End paddingValues lambda
     } // End Scaffold
 } // End ReportDetailScreen
 
