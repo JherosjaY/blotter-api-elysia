@@ -480,7 +480,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 if (result.isSuccess) {
                     Log.d("DashboardViewModel", "✅ Officer synced to cloud successfully!")
                     // Refresh officers from cloud to get the cloud ID
-                    syncOfficersFromCloud()
+                    val officersResult = apiRepository.getAllOfficersFromCloud()
+                    if (officersResult.isSuccess) {
+                        val cloudOfficers = officersResult.getOrNull() ?: emptyList()
+                        cloudOfficers.forEach { officer -> repository.insertOfficer(officer) }
+                        _allOfficers.value = cloudOfficers
+                        Log.d("DashboardViewModel", "✅ Officers refreshed from cloud")
+                    }
                 } else {
                     Log.e("DashboardViewModel", "❌ Failed to sync officer to cloud")
                 }
