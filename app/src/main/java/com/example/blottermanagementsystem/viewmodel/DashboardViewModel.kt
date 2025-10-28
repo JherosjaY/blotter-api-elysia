@@ -1035,17 +1035,95 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     
     // User Management
     suspend fun toggleUserStatus(userId: Int) {
-        val user = repository.getUserById(userId)
-        user?.let {
-            val updatedUser = it.copy(isActive = !it.isActive)
+        try {
+            val user = repository.getUserById(userId) ?: return
+            val newStatus = !user.isActive
+            val statusText = if (newStatus) "Activated" else "Terminated"
+            
+            Log.d("DashboardViewModel", "🔄 ${if (newStatus) "Activating" else "Terminating"} user: ${user.username} (ID: $userId)")
+            
+            // Update local database
+            val updatedUser = user.copy(isActive = newStatus)
             repository.updateUser(updatedUser)
+            Log.d("DashboardViewModel", "💾 User status updated in local database")
+            
+            // Sync to cloud
+            try {
+                val result = apiRepository.updateUserInfo(
+                    userId = userId,
+                    firstName = updatedUser.firstName,
+                    lastName = updatedUser.lastName,
+                    username = updatedUser.username
+                )
+                
+                // Also update isActive status via PUT /api/users/:id
+                val updateResult = apiRepository.updateUserPassword(userId, updatedUser.password)
+                
+                if (result.isSuccess && updateResult.isSuccess) {
+                    Log.d("DashboardViewModel", "✅ User $statusText and synced to cloud")
+                } else {
+                    Log.e("DashboardViewModel", "⚠️ User $statusText locally but cloud sync failed")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error syncing user status to cloud: ${e.message}", e)
+            }
+            
+            // Log activity
+            logActivity(
+                action = if (newStatus) "USER_ACTIVATED" else "USER_TERMINATED",
+                description = "User ${user.username} was $statusText",
+                performedBy = "Admin"
+            )
+            
+            Log.d("DashboardViewModel", "✅ User ${user.username} $statusText successfully")
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error toggling user status: ${e.message}", e)
         }
     }
     
     suspend fun deleteUser(userId: Int) {
-        val user = repository.getUserById(userId)
-        user?.let {
-            repository.deleteUser(it)
+        try {
+            val user = repository.getUserById(userId) ?: return
+            
+            Log.d("DashboardViewModel", "🗑️ Deleting user: ${user.username} (ID: $userId)")
+            
+            // Delete from cloud first
+            try {
+                val result = apiRepository.deleteUser(userId)
+                if (result.isSuccess) {
+                    Log.d("DashboardViewModel", "✅ User deleted from cloud")
+                } else {
+                    Log.e("DashboardViewModel", "⚠️ Failed to delete user from cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error deleting user from cloud: ${e.message}", e)
+            }
+            
+            // Delete user's reports
+            val userReports = repository.getReportsByUser(userId).first()
+            userReports.forEach { report ->
+                repository.deleteReport(report)
+            }
+            Log.d("DashboardViewModel", "🗑️ Deleted ${userReports.size} reports by user")
+            
+            // Delete user's notifications
+            repository.deleteAllNotificationsByUserId(userId)
+            Log.d("DashboardViewModel", "🗑️ Deleted user notifications")
+            
+            // Delete user from local database
+            repository.deleteUser(user)
+            Log.d("DashboardViewModel", "💾 User deleted from local database")
+            
+            // Log activity
+            logActivity(
+                action = "USER_DELETED",
+                description = "User ${user.username} was permanently deleted",
+                performedBy = "Admin"
+            )
+            
+            Log.d("DashboardViewModel", "✅ User ${user.username} deleted successfully")
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error deleting user: ${e.message}", e)
         }
     }
     
