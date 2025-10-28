@@ -70,8 +70,11 @@ export const usersRoutes = new Elysia({ prefix: "/users" })
         t.Object({
           firstName: t.String(),
           lastName: t.String(),
+          username: t.String(),
+          password: t.String(),
           isActive: t.Boolean(),
           profilePhotoUri: t.String(),
+          profileCompleted: t.Boolean(),
         })
       ),
     }
