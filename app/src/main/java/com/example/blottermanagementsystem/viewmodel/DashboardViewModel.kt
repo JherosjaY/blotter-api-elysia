@@ -298,6 +298,44 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         return repository.getReportsByStatus(status)
     }
     
+    // Get reports for specific user (for User role dashboard)
+    fun getReportsByUser(userId: Int): Flow<List<BlotterReport>> {
+        return repository.getReportsByUser(userId)
+    }
+    
+    // Refresh user reports from cloud (for User role)
+    fun refreshUserReports(userId: Int) {
+        viewModelScope.launch {
+            try {
+                Log.d("DashboardViewModel", "🔄 Refreshing user reports for userId=$userId...")
+                
+                // Sync reports from cloud
+                val result = apiRepository.getAllReportsFromCloud()
+                
+                if (result.isSuccess) {
+                    val cloudReports = result.getOrNull() ?: emptyList()
+                    Log.d("DashboardViewModel", "✅ Fetched ${cloudReports.size} reports from cloud")
+                    
+                    // Update local database
+                    cloudReports.forEach { report ->
+                        repository.insertReport(report)
+                    }
+                    
+                    // Filter user's reports
+                    val userReports = cloudReports.filter { it.userId == userId }
+                    Log.d("DashboardViewModel", "✅ User has ${userReports.size} reports")
+                    
+                    // Update allReports (which UserDashboard uses)
+                    _allReports.value = cloudReports
+                } else {
+                    Log.e("DashboardViewModel", "❌ Failed to fetch reports from cloud")
+                }
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Error refreshing user reports: ${e.message}", e)
+            }
+        }
+    }
+    
     fun getNotifications(userId: Int): Flow<List<Notification>> {
         return repository.getNotificationsByUserId(userId)
     }
