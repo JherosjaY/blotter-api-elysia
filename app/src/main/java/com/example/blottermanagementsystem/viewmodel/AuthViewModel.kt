@@ -252,6 +252,24 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     
                     val userId = repository.insertUser(newUser)
                     
+                    // Add to sync queue for cloud upload when internet returns
+                    try {
+                        val database = com.example.blottermanagementsystem.data.database.BlotterDatabase.getDatabase(getApplication())
+                        val syncQueueDao = database.syncQueueDao()
+                        val gson = com.google.gson.Gson()
+                        
+                        val syncItem = com.example.blottermanagementsystem.data.entity.SyncQueue(
+                            entityType = "User",
+                            entityId = userId.toInt(),
+                            action = "CREATE",
+                            data = gson.toJson(newUser.copy(id = userId.toInt()))
+                        )
+                        syncQueueDao.insert(syncItem)
+                        Log.d("AuthViewModel", "📋 User added to sync queue for cloud upload")
+                    } catch (e: Exception) {
+                        Log.e("AuthViewModel", "❌ Failed to add user to sync queue: ${e.message}", e)
+                    }
+                    
                     // Update FCM token for this device (so user can receive notifications immediately)
                     updateFcmTokenOnLogin(userId.toInt())
                     

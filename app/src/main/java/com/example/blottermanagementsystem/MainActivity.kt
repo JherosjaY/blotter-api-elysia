@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
                             networkMonitor.observeNetworkConnectivity().collect { isOnline ->
                                 if (isOnline) {
                                     android.util.Log.d("MainActivity", "🌐 Internet connected - Starting auto-sync...")
-                                    kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                         syncManager.processSyncQueue()
                                     }
                                 } else {

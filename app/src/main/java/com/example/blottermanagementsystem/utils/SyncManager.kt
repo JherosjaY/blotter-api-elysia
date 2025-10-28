@@ -63,6 +63,7 @@ class SyncManager(private val context: Context) {
             Log.d(TAG, "📤 Syncing ${item.entityType} (ID: ${item.entityId}, Action: ${item.action})")
             
             val success = when (item.entityType) {
+                "User" -> syncUser(item)
                 "Report" -> syncReport(item)
                 "Respondent" -> syncRespondent(item)
                 "Suspect" -> syncSuspect(item)
@@ -107,6 +108,23 @@ class SyncManager(private val context: Context) {
     }
     
     // Sync methods for each entity type
+    private suspend fun syncUser(item: SyncQueue): Boolean {
+        return try {
+            val user = gson.fromJson(item.data, com.example.blottermanagementsystem.data.entity.User::class.java)
+            val result = apiRepository.register(
+                username = user.username,
+                password = user.password, // Already hashed
+                firstName = user.firstName,
+                lastName = user.lastName,
+                role = user.role
+            )
+            result.isSuccess
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ User sync error: ${e.message}", e)
+            false
+        }
+    }
+    
     private suspend fun syncReport(item: SyncQueue): Boolean {
         return try {
             val report = gson.fromJson(item.data, com.example.blottermanagementsystem.data.entity.BlotterReport::class.java)
