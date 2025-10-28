@@ -199,33 +199,42 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun loadDashboardStats() {
         viewModelScope.launch {
             try {
-                // Always load from local first for instant UI update
+                // Always load from local first for instant UI update (no flickering)
                 Log.d("DashboardViewModel", "📱 Loading dashboard stats from local database...")
                 loadDashboardStatsFromLocal()
                 
-                // Then sync from cloud in background
-                Log.d("DashboardViewModel", "📊 Syncing dashboard stats from cloud API...")
-                val result = apiRepository.getDashboardStats()
+                // Then sync ALL data from cloud in background
+                Log.d("DashboardViewModel", "📊 Syncing all data from cloud API...")
                 
-                if (result.isSuccess) {
-                    val cloudStats = result.getOrNull()
-                    if (cloudStats != null) {
-                        _dashboardStats.value = cloudStats
-                        Log.d("DashboardViewModel", "✅ Cloud stats loaded: Users=${cloudStats.totalUsers}, officers=${cloudStats.totalOfficers}, Reports=${cloudStats.totalReports}")
-                    } else {
-                        Log.w("DashboardViewModel", "⚠️ Failed to fetch cloud stats, using local data")
-                        // Reload from local to ensure fresh count
-                        loadDashboardStatsFromLocal()
-                    }
-                } else {
-                    Log.w("DashboardViewModel", "❌ Failed to fetch cloud stats, using local data")
-                    // Fallback to local database
-                    try {
-                        loadDashboardStatsFromLocal()
-                    } catch (localError: Exception) {
-                        Log.e("DashboardViewModel", "❌ Error loading local stats: ${localError.message}", localError)
-                    }
+                // Sync users, officers, and reports FIRST (to update local DB)
+                val usersResult = apiRepository.getAllUsersFromCloud()
+                val officersResult = apiRepository.getAllOfficersFromCloud()
+                val reportsResult = apiRepository.getAllReportsFromCloud()
+                
+                // Update local database with cloud data
+                if (usersResult.isSuccess) {
+                    val cloudUsers = usersResult.getOrNull() ?: emptyList()
+                    cloudUsers.forEach { user -> repository.insertUser(user) }
+                    Log.d("DashboardViewModel", "✅ ${cloudUsers.size} users synced to local DB")
                 }
+                
+                if (officersResult.isSuccess) {
+                    val cloudOfficers = officersResult.getOrNull() ?: emptyList()
+                    cloudOfficers.forEach { officer -> repository.insertOfficer(officer) }
+                    Log.d("DashboardViewModel", "✅ ${cloudOfficers.size} officers synced to local DB")
+                }
+                
+                if (reportsResult.isSuccess) {
+                    val cloudReports = reportsResult.getOrNull() ?: emptyList()
+                    cloudReports.forEach { report -> repository.insertReport(report) }
+                    Log.d("DashboardViewModel", "✅ ${cloudReports.size} reports synced to local DB")
+                }
+                
+                // NOW reload stats from local DB (which has fresh cloud data)
+                // This ensures smooth update without flickering
+                loadDashboardStatsFromLocal()
+                Log.d("DashboardViewModel", "✅ Dashboard stats refreshed with cloud data!")
+                
             } catch (e: Exception) {
                 Log.e("DashboardViewModel", "❌ Error loading dashboard stats: ${e.message}", e)
                 // Fallback to local database
@@ -258,7 +267,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 totalOfficers = totalOfficers,
                 totalUsers = totalUsers
             )
-            Log.d("DashboardViewModel", "✅ Local stats loaded: Users=$totalUsers, Reports=$totalReports")
+            Log.d("DashboardViewModel", "✅ Stats: Users=$totalUsers, Officers=$totalOfficers, Active=$totalReports, Pending=$pendingReports, Ongoing=$ongoingReports, Resolved=$resolvedReports, Archived=$archivedReports")
         } catch (e: Exception) {
             Log.e("DashboardViewModel", "❌ Error loading local stats: ${e.message}", e)
         }
