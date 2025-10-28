@@ -68,12 +68,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val recentReports: StateFlow<List<BlotterReport>> = _recentReports
     
     init {
-        loadDashboardStats()
+        // Load stats and sync data on app start
+        loadDashboardStats() // This now handles sequential syncing
         loadRecentReports()
         loadAllReports()
-        syncUsersFromCloud() // Sync users from API
-        syncOfficersFromCloud() // Sync officers from API
-        syncReportsFromCloud() // Sync reports from API (for officers/admin)
         
         // Auto-cleanup old data on app startup (runs in background)
         viewModelScope.launch {
@@ -87,101 +85,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     
-    // NEW: Sync users from cloud API
-    private fun syncUsersFromCloud() {
-        viewModelScope.launch {
-            try {
-                Log.d("DashboardViewModel", "👥 Syncing users from cloud API...")
-                val result = apiRepository.getAllUsersFromCloud()
-                
-                if (result.isSuccess) {
-                    val cloudUsers = result.getOrNull() ?: emptyList()
-                    Log.d("DashboardViewModel", "✅ Fetched ${cloudUsers.size} users from cloud")
-                    
-                    // Update local database
-                    cloudUsers.forEach { user ->
-                        repository.insertUser(user)
-                    }
-                    
-                    // Update UI
-                    _allUsers.value = cloudUsers
-                    Log.d("DashboardViewModel", "✅ Users synced successfully!")
-                } else {
-                    Log.e("DashboardViewModel", "❌ Failed to fetch users from cloud")
-                    // Fallback to local database
-                    _allUsers.value = repository.getAllUsersSync()
-                }
-            } catch (e: Exception) {
-                Log.e("DashboardViewModel", "❌ Error syncing users: ${e.message}", e)
-                // Fallback to local database
-                _allUsers.value = repository.getAllUsersSync()
-            }
-        }
-    }
-    
-    // NEW: Sync officers from cloud API
-    private fun syncOfficersFromCloud() {
-        viewModelScope.launch {
-            try {
-                Log.d("DashboardViewModel", "👮 Syncing officers from cloud API...")
-                val result = apiRepository.getAllOfficersFromCloud()
-                
-                if (result.isSuccess) {
-                    val cloudOfficers = result.getOrNull() ?: emptyList()
-                    Log.d("DashboardViewModel", "✅ Fetched ${cloudOfficers.size} officers from cloud")
-                    
-                    // Update local database
-                    cloudOfficers.forEach { officer ->
-                        repository.insertOfficer(officer)
-                    }
-                    
-                    // Update UI
-                    _allOfficers.value = cloudOfficers
-                    Log.d("DashboardViewModel", "✅ Officers synced successfully!")
-                } else {
-                    Log.e("DashboardViewModel", "❌ Failed to fetch officers from cloud")
-                    // Fallback to local database
-                    _allOfficers.value = repository.getAllOfficersSync()
-                }
-            } catch (e: Exception) {
-                Log.e("DashboardViewModel", "❌ Error syncing officers: ${e.message}", e)
-                // Fallback to local database
-                _allOfficers.value = repository.getAllOfficersSync()
-            }
-        }
-    }
-    
-    // NEW: Sync reports from cloud API (for Admin/Officer)
-    private fun syncReportsFromCloud() {
-        viewModelScope.launch {
-            try {
-                Log.d("DashboardViewModel", "📋 Syncing reports from cloud API...")
-                val result = apiRepository.getAllReportsFromCloud()
-                
-                if (result.isSuccess) {
-                    val cloudReports = result.getOrNull() ?: emptyList()
-                    Log.d("DashboardViewModel", "✅ Fetched ${cloudReports.size} reports from cloud")
-                    
-                    // Update local database
-                    cloudReports.forEach { report ->
-                        repository.insertReport(report)
-                    }
-                    
-                    // Update UI
-                    _allReports.value = cloudReports
-                    Log.d("DashboardViewModel", "✅ Reports synced successfully!")
-                } else {
-                    Log.e("DashboardViewModel", "❌ Failed to fetch reports from cloud")
-                    // Fallback to local database
-                    _allReports.value = repository.getAllActiveReports().first()
-                }
-            } catch (e: Exception) {
-                Log.e("DashboardViewModel", "❌ Error syncing reports: ${e.message}", e)
-                // Fallback to local database
-                _allReports.value = repository.getAllActiveReports().first()
-            }
-        }
-    }
     
     private fun loadAllReports() {
         viewModelScope.launch {
@@ -203,30 +106,33 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.d("DashboardViewModel", "📱 Loading dashboard stats from local database...")
                 loadDashboardStatsFromLocal()
                 
-                // Then sync ALL data from cloud in background
-                Log.d("DashboardViewModel", "📊 Syncing all data from cloud API...")
+                // Then sync ALL data from cloud SEQUENTIALLY (wait for each to complete)
+                Log.d("DashboardViewModel", "📊 Syncing all data from cloud API (SEQUENTIAL)...")
                 
-                // Sync users, officers, and reports FIRST (to update local DB)
+                // Sync users FIRST
                 val usersResult = apiRepository.getAllUsersFromCloud()
-                val officersResult = apiRepository.getAllOfficersFromCloud()
-                val reportsResult = apiRepository.getAllReportsFromCloud()
-                
-                // Update local database with cloud data
                 if (usersResult.isSuccess) {
                     val cloudUsers = usersResult.getOrNull() ?: emptyList()
                     cloudUsers.forEach { user -> repository.insertUser(user) }
+                    _allUsers.value = cloudUsers
                     Log.d("DashboardViewModel", "✅ ${cloudUsers.size} users synced to local DB")
                 }
                 
+                // Then sync officers
+                val officersResult = apiRepository.getAllOfficersFromCloud()
                 if (officersResult.isSuccess) {
                     val cloudOfficers = officersResult.getOrNull() ?: emptyList()
                     cloudOfficers.forEach { officer -> repository.insertOfficer(officer) }
+                    _allOfficers.value = cloudOfficers
                     Log.d("DashboardViewModel", "✅ ${cloudOfficers.size} officers synced to local DB")
                 }
                 
+                // Finally sync reports
+                val reportsResult = apiRepository.getAllReportsFromCloud()
                 if (reportsResult.isSuccess) {
                     val cloudReports = reportsResult.getOrNull() ?: emptyList()
                     cloudReports.forEach { report -> repository.insertReport(report) }
+                    _allReports.value = cloudReports
                     Log.d("DashboardViewModel", "✅ ${cloudReports.size} reports synced to local DB")
                 }
                 
@@ -356,14 +262,54 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     // Add refresh function for pull-to-refresh
-    fun refreshDashboard() {
-        Log.d("DashboardViewModel", "🔄 Refreshing dashboard...")
-        loadDashboardStats()
-        loadRecentReports()
-        loadAllReports()
-        syncUsersFromCloud() // Re-sync users from cloud
-        syncOfficersFromCloud() // Re-sync officers from cloud
-        syncReportsFromCloud() // Re-sync reports from cloud
+    suspend fun refreshDashboard() {
+        Log.d("DashboardViewModel", "🔄 Refreshing dashboard - WAIT FOR ALL SYNCS...")
+        
+        try {
+            // STEP 1: Sync ALL data from cloud FIRST (wait for completion)
+            Log.d("DashboardViewModel", "📥 Step 1: Syncing users from cloud...")
+            val usersResult = apiRepository.getAllUsersFromCloud()
+            if (usersResult.isSuccess) {
+                val cloudUsers = usersResult.getOrNull() ?: emptyList()
+                cloudUsers.forEach { user -> repository.insertUser(user) }
+                _allUsers.value = cloudUsers
+                Log.d("DashboardViewModel", "✅ ${cloudUsers.size} users synced")
+            }
+            
+            Log.d("DashboardViewModel", "📥 Step 2: Syncing officers from cloud...")
+            val officersResult = apiRepository.getAllOfficersFromCloud()
+            if (officersResult.isSuccess) {
+                val cloudOfficers = officersResult.getOrNull() ?: emptyList()
+                cloudOfficers.forEach { officer -> repository.insertOfficer(officer) }
+                _allOfficers.value = cloudOfficers
+                Log.d("DashboardViewModel", "✅ ${cloudOfficers.size} officers synced")
+            }
+            
+            Log.d("DashboardViewModel", "📥 Step 3: Syncing reports from cloud...")
+            val reportsResult = apiRepository.getAllReportsFromCloud()
+            if (reportsResult.isSuccess) {
+                val cloudReports = reportsResult.getOrNull() ?: emptyList()
+                cloudReports.forEach { report -> repository.insertReport(report) }
+                _allReports.value = cloudReports
+                Log.d("DashboardViewModel", "✅ ${cloudReports.size} reports synced")
+            }
+            
+            // STEP 2: NOW reload stats from local DB (which has fresh cloud data)
+            Log.d("DashboardViewModel", "📊 Step 4: Reloading stats from local DB...")
+            loadDashboardStatsFromLocal()
+            
+            // STEP 3: Reload recent reports
+            Log.d("DashboardViewModel", "📋 Step 5: Reloading recent reports...")
+            val reports = repository.getAllActiveReports().first()
+            _recentReports.value = reports.take(5)
+            
+            Log.d("DashboardViewModel", "✅ Dashboard refresh COMPLETE!")
+            
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error refreshing dashboard: ${e.message}", e)
+            // Fallback to local data
+            loadDashboardStatsFromLocal()
+        }
     }
     
     suspend fun insertReport(report: BlotterReport, createdBy: String, creatorUserId: Int = 0): Long {
