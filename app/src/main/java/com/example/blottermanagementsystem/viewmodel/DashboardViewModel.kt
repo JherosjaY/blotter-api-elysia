@@ -74,6 +74,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         syncUsersFromCloud() // Sync users from API
         syncOfficersFromCloud() // Sync officers from API
         syncReportsFromCloud() // Sync reports from API (for officers/admin)
+        
+        // Auto-cleanup old data on app startup (runs in background)
+        viewModelScope.launch {
+            try {
+                // Wait 5 seconds after app starts to avoid slowing down initial load
+                kotlinx.coroutines.delay(5000)
+                cleanupOldLocalData(daysToKeep = 30)
+            } catch (e: Exception) {
+                Log.e("DashboardViewModel", "❌ Auto-cleanup error: ${e.message}", e)
+            }
+        }
     }
     
     // NEW: Sync users from cloud API
@@ -1189,6 +1200,112 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         repository.insertResolution(resolution)
         refreshStats()
     }
+    
+    // ==================== SMART CACHING & CLEANUP ====================
+    
+    /**
+     * Auto-cleanup old resolved reports from local database
+     * Keeps only recent reports (last 30 days) locally
+     * Cloud database keeps ALL reports forever
+     * 
+     * Benefits:
+     * - Reduces app storage size
+     * - Faster performance (less local data)
+     * - Old reports still accessible from cloud
+     */
+    suspend fun cleanupOldLocalData(daysToKeep: Int = 30) {
+        try {
+            val cutoffTime = System.currentTimeMillis() - (daysToKeep * 24 * 60 * 60 * 1000L)
+            
+            Log.d("DashboardViewModel", "🧹 Starting cleanup of reports older than $daysToKeep days...")
+            
+            // Get all reports
+            val allReports = repository.getAllActiveReports().first()
+            
+            // Filter old resolved/archived reports
+            val oldReports = allReports.filter { report ->
+                (report.status == "Resolved" || report.isArchived) && 
+                report.dateFiled < cutoffTime
+            }
+            
+            Log.d("DashboardViewModel", "📊 Found ${oldReports.size} old reports to clean up")
+            
+            // Delete from local database only (cloud keeps them)
+            oldReports.forEach { report ->
+                repository.deleteReport(report)
+                Log.d("DashboardViewModel", "🗑️ Removed report ${report.id} (${report.caseNumber}) from local cache")
+            }
+            
+            Log.d("DashboardViewModel", "✅ Cleanup complete! Removed ${oldReports.size} old reports from local storage")
+            Log.d("DashboardViewModel", "☁️ All data still safe in cloud database!")
+            
+            // Refresh stats after cleanup
+            refreshStats()
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error during cleanup: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Clear all cache (for Settings → Clear Cache)
+     * Removes all local data except user's own active reports
+     */
+    suspend fun clearAllCache(currentUserId: Int) {
+        try {
+            Log.d("DashboardViewModel", "🧹 Clearing all cache...")
+            
+            val allReports = repository.getAllActiveReports().first()
+            
+            // Keep only user's own active reports
+            val reportsToDelete = allReports.filter { report ->
+                report.userId != currentUserId || 
+                report.status == "Resolved" || 
+                report.isArchived
+            }
+            
+            reportsToDelete.forEach { report ->
+                repository.deleteReport(report)
+            }
+            
+            Log.d("DashboardViewModel", "✅ Cache cleared! Removed ${reportsToDelete.size} reports")
+            Log.d("DashboardViewModel", "💾 Kept user's active reports")
+            
+            refreshStats()
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error clearing cache: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Get storage info for Settings screen
+     */
+    suspend fun getStorageInfo(): StorageInfo {
+        return try {
+            val allReports = repository.getAllActiveReports().first()
+            val totalReports = allReports.size
+            val recentReports = allReports.count { 
+                it.dateFiled > System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
+            }
+            val oldReports = totalReports - recentReports
+            
+            StorageInfo(
+                totalReports = totalReports,
+                recentReports = recentReports,
+                oldReports = oldReports,
+                estimatedSizeMB = totalReports * 0.5 // Rough estimate: 0.5 MB per report
+            )
+        } catch (e: Exception) {
+            Log.e("DashboardViewModel", "❌ Error getting storage info: ${e.message}", e)
+            StorageInfo(0, 0, 0, 0.0)
+        }
+    }
 }
+
+data class StorageInfo(
+    val totalReports: Int,
+    val recentReports: Int,
+    val oldReports: Int,
+    val estimatedSizeMB: Double
+)
 
 
