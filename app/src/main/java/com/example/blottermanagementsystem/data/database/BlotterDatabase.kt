@@ -36,9 +36,10 @@ import java.security.MessageDigest
         KPForm::class,
         MediationSession::class,
         CaseTimeline::class,
-        CaseTemplate::class
+        CaseTemplate::class,
+        SyncQueue::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class BlotterDatabase : RoomDatabase() {
@@ -65,6 +66,7 @@ abstract class BlotterDatabase : RoomDatabase() {
     abstract fun mediationSessionDao(): MediationSessionDao
     abstract fun caseTimelineDao(): CaseTimelineDao
     abstract fun caseTemplateDao(): CaseTemplateDao
+    abstract fun syncQueueDao(): SyncQueueDao
     
     companion object {
         @Volatile
