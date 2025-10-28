@@ -142,14 +142,24 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 text = {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth()
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 400.dp)
                                     ) {
-                                        Text(
-                                            text = whatsNewMessage,
-                                            fontSize = 14.sp,
-                                            lineHeight = 20.sp
-                                        )
+                                        androidx.compose.foundation.verticalScroll(
+                                            androidx.compose.foundation.rememberScrollState()
+                                        ).run {
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth().then(this)
+                                            ) {
+                                                Text(
+                                                    text = whatsNewMessage,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp
+                                                )
+                                            }
+                                        }
                                     }
                                 },
                                 confirmButton = {
@@ -307,34 +317,34 @@ class MainActivity : ComponentActivity() {
     private fun getWhatsNewMessage(versionCode: Int): String {
         return when (versionCode) {
             2 -> """
-                ✅ Account Notifications
+                Account Notifications
                 • Get notified when your account is terminated or deleted
                 • Clear communication from administrators
                 
-                ✅ User Management Improvements
+                User Management Improvements
                 • Admins can now terminate or delete user accounts
                 • All actions sync to cloud and across devices
                 
-                ✅ Cloud Sync Enhancements
+                Cloud Sync Enhancements
                 • Person history now syncs to cloud
                 • Officers can view complete history from all devices
                 
-                ✅ Smart Caching
+                Smart Caching
                 • App automatically cleans up old data
                 • Keeps app size small while maintaining access to all records
                 
-                ✅ Password Management
+                Password Management
                 • Improved password change functionality
                 • Better error messages and debugging
                 
-                ✅ Bug Fixes
+                Bug Fixes
                 • Fixed various issues and improved stability
             """.trimIndent()
             
             else -> """
-                ✅ New features and improvements
-                ✅ Bug fixes and performance enhancements
-                ✅ Better user experience
+                New features and improvements
+                Bug fixes and performance enhancements
+                Better user experience
             """.trimIndent()
         }
     }

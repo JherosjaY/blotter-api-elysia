@@ -493,37 +493,70 @@ fun SettingsScreen(
                 }
             },
             text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = """
-                            ✅ Account Notifications
-                            • Get notified when your account is terminated or deleted
-                            • Clear communication from administrators
-                            
-                            ✅ User Management Improvements
-                            • Admins can now terminate or delete user accounts
-                            • All actions sync to cloud and across devices
-                            
-                            ✅ Cloud Sync Enhancements
-                            • Person history now syncs to cloud
-                            • Officers can view complete history from all devices
-                            
-                            ✅ Smart Caching
-                            • App automatically cleans up old data
-                            • Keeps app size small while maintaining access to all records
-                            
-                            ✅ Password Management
-                            • Improved password change functionality
-                            • Better error messages and debugging
-                            
-                            ✅ Bug Fixes
-                            • Fixed various issues and improved stability
-                        """.trimIndent(),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
+                    item {
+                        FeatureItem(
+                            title = "Account Notifications",
+                            items = listOf(
+                                "Get notified when your account is terminated or deleted",
+                                "Clear communication from administrators"
+                            )
+                        )
+                    }
+                    
+                    item {
+                        FeatureItem(
+                            title = "User Management Improvements",
+                            items = listOf(
+                                "Admins can now terminate or delete user accounts",
+                                "All actions sync to cloud and across devices"
+                            )
+                        )
+                    }
+                    
+                    item {
+                        FeatureItem(
+                            title = "Cloud Sync Enhancements",
+                            items = listOf(
+                                "Person history now syncs to cloud",
+                                "Officers can view complete history from all devices"
+                            )
+                        )
+                    }
+                    
+                    item {
+                        FeatureItem(
+                            title = "Smart Caching",
+                            items = listOf(
+                                "App automatically cleans up old data",
+                                "Keeps app size small while maintaining access to all records"
+                            )
+                        )
+                    }
+                    
+                    item {
+                        FeatureItem(
+                            title = "Password Management",
+                            items = listOf(
+                                "Improved password change functionality",
+                                "Better error messages and debugging"
+                            )
+                        )
+                    }
+                    
+                    item {
+                        FeatureItem(
+                            title = "Bug Fixes",
+                            items = listOf(
+                                "Fixed various issues and improved stability"
+                            )
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -636,5 +669,53 @@ fun SettingItem(
             contentDescription = null,
             tint = TextSecondary
         )
+    }
+}
+
+@Composable
+fun FeatureItem(
+    title: String,
+    items: List<String>
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = SuccessGreen,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+        }
+        
+        items.forEach { item ->
+            Row(
+                modifier = Modifier.padding(start = 28.dp, bottom = 4.dp)
+            ) {
+                Text(
+                    text = "•",
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = item,
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    lineHeight = 18.sp
+                )
+            }
+        }
     }
 }
