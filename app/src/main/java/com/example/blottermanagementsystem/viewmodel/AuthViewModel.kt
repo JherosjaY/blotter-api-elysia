@@ -289,17 +289,31 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         return try {
             val user = repository.getUserById(userId) ?: return false
             
+            Log.d("AuthViewModel", "🔐 Attempting password change for user: ${user.username} (ID: $userId)")
+            Log.d("AuthViewModel", "📝 Current password hash (first 10 chars): ${user.password.take(10)}...")
+            
+            // Hash the entered current password
+            val hashedCurrentPassword = SecurityUtils.hashPassword(currentPassword)
+            Log.d("AuthViewModel", "📝 Entered password hash (first 10 chars): ${hashedCurrentPassword.take(10)}...")
+            
             // Verify current password
             if (!SecurityUtils.verifyPassword(currentPassword, user.password)) {
+                Log.e("AuthViewModel", "❌ Current password verification FAILED!")
+                Log.e("AuthViewModel", "   Stored hash: ${user.password}")
+                Log.e("AuthViewModel", "   Entered hash: ${hashedCurrentPassword}")
                 return false
             }
             
+            Log.d("AuthViewModel", "✅ Current password verified successfully")
+            
             // Hash new password
             val hashedNewPassword = SecurityUtils.hashPassword(newPassword)
+            Log.d("AuthViewModel", "🔑 New password hash (first 10 chars): ${hashedNewPassword.take(10)}...")
             
             // Update user password locally
             val updatedUser = user.copy(password = hashedNewPassword)
             repository.updateUser(updatedUser)
+            Log.d("AuthViewModel", "💾 Password updated in local database")
             
             // Sync to cloud API
             try {
@@ -315,6 +329,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             
             true
         } catch (e: Exception) {
+            Log.e("AuthViewModel", "❌ Change password exception: ${e.message}", e)
             false
         }
     }
