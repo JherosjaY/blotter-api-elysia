@@ -1089,7 +1089,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             
             // Log activity
             logActivity(
-                action = if (newStatus) "USER_ACTIVATED" else "USER_TERMINATED",
+                activityType = if (newStatus) "USER_ACTIVATED" else "USER_TERMINATED",
                 description = "User ${user.username} was $statusText",
                 performedBy = "Admin"
             )
@@ -1154,7 +1154,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             
             // Log activity
             logActivity(
-                action = "USER_DELETED",
+                activityType = "USER_DELETED",
                 description = "User ${user.username} was permanently deleted",
                 performedBy = "Admin"
             )

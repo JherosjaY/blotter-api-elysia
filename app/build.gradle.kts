@@ -10,7 +10,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.example.blottermanagementsystem"
-        minSdk = 24  // Android 7.0+ (supports most devices including Android 10)
+        minSdk = 26  // Increased from 24 to support Apache POI for Excel export
         targetSdk = 36
         versionCode = 2
         versionName = "1.0.1"
