@@ -1300,8 +1300,8 @@ fun ReportDetailScreen(
                 }
             )
         }
-    }
-}
+    } // End Scaffold
+} // End ReportDetailScreen
 
 @Composable
 fun DetailCard(
