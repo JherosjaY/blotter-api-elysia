@@ -12,11 +12,20 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.blottermanagementsystem.ui.theme.ElectricBlue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -81,34 +90,78 @@ class MainActivity : ComponentActivity() {
                         val authViewModel: AuthViewModel = viewModel()
                         val context = LocalContext.current
                         
-                        // Version check state
-                        var showUpdateDialog by remember { mutableStateOf(false) }
-                        var versionInfo by remember { mutableStateOf<VersionChecker.VersionInfo?>(null) }
+                        // What's New dialog state
+                        var showWhatsNewDialog by remember { mutableStateOf(false) }
+                        var whatsNewMessage by remember { mutableStateOf("") }
                         
-                        // Check for app updates
+                        // Check if app was just updated
                         LaunchedEffect(Unit) {
-                            val apiRepository = ApiRepository()
-                            val updateInfo = VersionChecker.checkForUpdate(context, apiRepository)
-                            if (updateInfo != null) {
-                                versionInfo = updateInfo
-                                showUpdateDialog = true
+                            val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                            val lastVersion = prefs.getInt("last_version_code", 0)
+                            val currentVersion = BuildConfig.VERSION_CODE
+                            
+                            android.util.Log.d("MainActivity", "🔍 Last version: $lastVersion, Current: $currentVersion")
+                            
+                            // Show "What's New" if version increased
+                            if (currentVersion > lastVersion && lastVersion > 0) {
+                                android.util.Log.d("MainActivity", "✅ App updated! Showing What's New dialog")
+                                whatsNewMessage = getWhatsNewMessage(currentVersion)
+                                showWhatsNewDialog = true
+                                
+                                // Save current version
+                                prefs.edit().putInt("last_version_code", currentVersion).apply()
+                            } else if (lastVersion == 0) {
+                                // First install, just save version (don't show dialog)
+                                android.util.Log.d("MainActivity", "📱 First install, saving version")
+                                prefs.edit().putInt("last_version_code", currentVersion).apply()
                             }
                         }
                         
-                        // Show update dialog if available
-                        if (showUpdateDialog && versionInfo != null) {
-                            UpdateDialog(
-                                currentVersion = versionInfo!!.currentVersionName,
-                                latestVersion = versionInfo!!.latestVersionName,
-                                updateMessage = versionInfo!!.updateMessage,
-                                forceUpdate = versionInfo!!.forceUpdate,
-                                updateUrl = versionInfo!!.updateUrl,
-                                onDismiss = {
-                                    showUpdateDialog = false
-                                    if (!versionInfo!!.forceUpdate) {
-                                        VersionChecker.dismissVersion(context, versionInfo!!.latestVersion)
+                        // Show What's New dialog
+                        if (showWhatsNewDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showWhatsNewDialog = false },
+                                title = {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.NewReleases,
+                                            contentDescription = null,
+                                            tint = ElectricBlue,
+                                            modifier = Modifier.size(64.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "What's New in v${BuildConfig.VERSION_NAME}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 20.sp,
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
-                                }
+                                },
+                                text = {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = whatsNewMessage,
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp
+                                        )
+                                    }
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = { showWhatsNewDialog = false },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Got it!")
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(20.dp)
                             )
                         }
                         
@@ -228,6 +281,44 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+    
+    /**
+     * Get What's New message based on version code
+     */
+    private fun getWhatsNewMessage(versionCode: Int): String {
+        return when (versionCode) {
+            2 -> """
+                ✅ Account Notifications
+                • Get notified when your account is terminated or deleted
+                • Clear communication from administrators
+                
+                ✅ User Management Improvements
+                • Admins can now terminate or delete user accounts
+                • All actions sync to cloud and across devices
+                
+                ✅ Cloud Sync Enhancements
+                • Person history now syncs to cloud
+                • Officers can view complete history from all devices
+                
+                ✅ Smart Caching
+                • App automatically cleans up old data
+                • Keeps app size small while maintaining access to all records
+                
+                ✅ Password Management
+                • Improved password change functionality
+                • Better error messages and debugging
+                
+                ✅ Bug Fixes
+                • Fixed various issues and improved stability
+            """.trimIndent()
+            
+            else -> """
+                ✅ New features and improvements
+                ✅ Bug fixes and performance enhancements
+                ✅ Better user experience
+            """.trimIndent()
         }
     }
     
