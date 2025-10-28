@@ -38,6 +38,7 @@ fun SettingsScreen(
     
     var showVersionDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showWhatsNewDialog by remember { mutableStateOf(false) }
     
     // Version info from backend
     var latestVersion by remember { mutableStateOf("1.0.0") }
@@ -206,6 +207,13 @@ fun SettingsScreen(
                             description = "View privacy policy",
                             icon = Icons.Default.Lock,
                             onClick = { showPrivacyDialog = true }
+                        )
+                        Divider(color = DividerColor, modifier = Modifier.padding(vertical = 8.dp))
+                        SettingItem(
+                            title = "Test What's New Dialog",
+                            description = "Preview update dialog (for testing)",
+                            icon = Icons.Default.NewReleases,
+                            onClick = { showWhatsNewDialog = true }
                         )
                     }
                 }
@@ -556,6 +564,77 @@ fun SettingItem(
             imageVector = Icons.Default.KeyboardArrowRight,
             contentDescription = null,
             tint = TextSecondary
+        )
+    }
+    
+    // What's New Test Dialog
+    if (showWhatsNewDialog) {
+        AlertDialog(
+            onDismissRequest = { showWhatsNewDialog = false },
+            title = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NewReleases,
+                        contentDescription = null,
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "What's New in v${com.example.blottermanagementsystem.BuildConfig.VERSION_NAME}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = """
+                            ✅ Account Notifications
+                            • Get notified when your account is terminated or deleted
+                            • Clear communication from administrators
+                            
+                            ✅ User Management Improvements
+                            • Admins can now terminate or delete user accounts
+                            • All actions sync to cloud and across devices
+                            
+                            ✅ Cloud Sync Enhancements
+                            • Person history now syncs to cloud
+                            • Officers can view complete history from all devices
+                            
+                            ✅ Smart Caching
+                            • App automatically cleans up old data
+                            • Keeps app size small while maintaining access to all records
+                            
+                            ✅ Password Management
+                            • Improved password change functionality
+                            • Better error messages and debugging
+                            
+                            ✅ Bug Fixes
+                            • Fixed various issues and improved stability
+                        """.trimIndent(),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showWhatsNewDialog = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Got it!")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp)
         )
     }
 }
