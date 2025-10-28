@@ -165,6 +165,23 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         
+                        // Network monitoring and auto-sync
+                        LaunchedEffect(Unit) {
+                            val networkMonitor = com.example.blottermanagementsystem.utils.NetworkMonitor(context)
+                            val syncManager = com.example.blottermanagementsystem.utils.SyncManager(context)
+                            
+                            networkMonitor.observeNetworkConnectivity().collect { isOnline ->
+                                if (isOnline) {
+                                    android.util.Log.d("MainActivity", "🌐 Internet connected - Starting auto-sync...")
+                                    kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                        syncManager.processSyncQueue()
+                                    }
+                                } else {
+                                    android.util.Log.d("MainActivity", "📵 Internet disconnected - Offline mode")
+                                }
+                            }
+                        }
+                        
                         // Handle notification navigation
                         LaunchedEffect(Unit) {
                             intent?.let { notificationIntent ->
