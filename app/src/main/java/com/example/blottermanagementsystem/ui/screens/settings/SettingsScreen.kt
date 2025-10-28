@@ -41,7 +41,7 @@ fun SettingsScreen(
     var showWhatsNewDialog by remember { mutableStateOf(false) }
     
     // Version info from backend
-    var latestVersion by remember { mutableStateOf("1.0.0") }
+    var latestVersion by remember { mutableStateOf(com.example.blottermanagementsystem.BuildConfig.VERSION_NAME) }
     var versionDescription by remember { mutableStateOf("A comprehensive system for managing barangay blotter reports, case tracking, and legal documentation.") }
     var isLoadingVersion by remember { mutableStateOf(false) }
     

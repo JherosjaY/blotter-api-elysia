@@ -84,15 +84,7 @@ android {
         )
     }
     
-    // Optimize APK splits for smaller downloads
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            isUniversalApk = false
-        }
-    }
+    // Universal APK with all architectures (removed splits to avoid conflict with ndk abiFilters)
 }
 
 dependencies {
